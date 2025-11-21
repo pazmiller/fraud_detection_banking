@@ -1,0 +1,86 @@
+# Core Framework Dependencies
+google-generativeai>=0.3.0
+google-cloud-aiplatform>=1.38.0
+
+# OCR Engine Dependencies
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0  # Use paddlepaddle-gpu for GPU support
+
+# CLIP Engine Dependencies (安装方式见下方注释)
+# 需要手动安装: pip install git+https://github.com/openai/CLIP.git
+torch>=2.0.0
+torchvision>=0.15.0
+ftfy>=6.1.0
+regex>=2023.0.0
+
+# Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+scikit-image>=0.21.0
+
+# PDF Processing
+pdf2image>=1.16.0
+pypdfium2>=4.0.0
+# poppler-utils  # System dependency for pdf2image (install separately on Windows)
+
+# Scientific Computing
+scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# Vector Database & Embeddings (可选)
+# chromadb>=0.4.0
+# sentence-transformers>=2.2.0
+
+# API & Web Framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+gradio>=4.0.0  # Web界面
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+requests>=2.31.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Development
+black>=23.0.0
+flake8>=6.0.0
+
+# ==============================================
+# 安装说明:
+# ==============================================
+# 
+# 1. 基础安装:
+#    pip install -r requirements.txt
+#
+# 2. CLIP必须单独安装:
+#    pip install git+https://github.com/openai/CLIP.git
+#
+# 3. PyTorch (根据您的系统选择):
+#    # CPU版本:
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#    
+#    # GPU版本 (CUDA 11.8):
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#
+# 4. 可选依赖（如果需要完整功能）:
+#    pip install chromadb sentence-transformers
+#
+# ==============================================
+
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Logging & Monitoring
+loguru>=0.7.0
+
+# Optional: For better performance
+# numba>=0.58.0
+# cupy-cuda11x>=12.0.0  # For GPU acceleration (if using CUDA 11.x)

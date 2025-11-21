@@ -314,34 +314,35 @@ class BankStatementCLIPEngine:
             'tampering_detection': self.detect_tampering_signs(image_path)
         }
         
-        print(f"\n  1. Document Verification:")
+        ''' For individual testing only: Cancel comment out to test'''
+        # print(f"\n  1. Document Verification:")
         verification = results['verification']
-        if verification['is_bank_statement']:
-            print(f"     ✅ Confirmed as bank statement")
-        else:
-            print(f"     ❌ Not a bank statement")
-        print(f"     Confidence: {verification['confidence']:.1%}")
-        print(f"     Predicted Type: {verification['predicted_type']}")
+        # if verification['is_bank_statement']:
+        #     print(f"     Confirmed as bank statement")
+        # else:
+        #     print(f"     ❌ Not a bank statement")
+        # print(f"     Confidence: {verification['confidence']:.1%}")
+        # print(f"     Predicted Type: {verification['predicted_type']}")
         
-        print(f"\n  2. Quality Assessment:")
+        # print(f"\n  2. Quality Assessment:")
         quality = results['quality_assessment']
         quality_level = quality['quality_level']
-        if quality_level == "high":
-            print(f"     ✅ High Quality Document")
-        elif quality_level == "medium":
-            print(f"     Medium Quality Document")
-        else:
-            print(f"     ❌ Low Quality Document")
-        print(f"     Quality Level: {quality_level.upper()}")
-        print(f"     Quality Score: {quality['quality_score']:.1%}")
+        # if quality_level == "high":
+        #     print(f"     High Quality Document")
+        # elif quality_level == "medium":
+        #     print(f"     Medium Quality Document")
+        # else:
+        #     print(f"     ❌ Low Quality Document")
+        # print(f"     Quality Level: {quality_level.upper()}")
+        # print(f"     Quality Score: {quality['quality_score']:.1%}")
         
-        print(f"\n  3. Tampering Detection:")
+        # print(f"\n  3. Tampering Detection:")
         tampering = results['tampering_detection']
         tampering_score = tampering['tampering_risk_score']
         authentic_score = tampering['authenticity_score']
         
         if tampering_score > 0.5:
-            print(f"     🔴 Highly Suspicious")
+            print(f"     Highly Suspicious")
         elif tampering_score > 0.35:
             print(f"     Moderately Suspicious")
         elif tampering_score > 0.25:
@@ -379,7 +380,8 @@ class BankStatementCLIPEngine:
             'recommendation': 'REJECT' if risk_score > 0.6 else 'MANUAL_REVIEW' if risk_score > 0.3 else 'ACCEPT'
         }
         
-        print(f"\n  4. CLIP Overall Risk:")
+        
+        print(f"\n[CLIP Overall Risk]:")
         print(f"     Risk Score: {results['overall_risk']['risk_score']:.1%}")
         print(f"     Risk Level: {results['overall_risk']['risk_level']}")
         print(f"     Recommendation: {results['overall_risk']['recommendation']}")
@@ -464,34 +466,3 @@ class BankStatementCLIPEngine:
         if errors > 0:
             print(f"   Error: {errors} ({errors/total*100:.1f}%)")
         print()
-
-
-def demo_clip_engine():
-
-    engine = BankStatementCLIPEngine()
-    test_image = "bank_statement_sample.jpg"  
-    results = engine.comprehensive_analysis(test_image)
-    
-    print("\n=== CLIP Conclusion ===")
-    print(f"\n1. Base Verification:")
-    print(f"   Is it bank statement: {results['verification']['is_bank_statement']}")
-    print(f"   Confidence: {results['verification']['confidence']:.2%}")
-    print(f"   Predicted type: {results['verification']['predicted_type']}")
-    
-    print(f"\n2. Quality Assessment:")
-    print(f"   Quality score: {results['quality_assessment']['quality_score']:.2%}")
-    print(f"   Quality assessment: {results['quality_assessment']['quality_assessment']}")
-    
-    print(f"\n3. Tampering Detection:")
-    print(f"   Tampering risk score: {results['tampering_detection']['tampering_risk_score']:.2%}")
-    print(f"   Authenticity score: {results['tampering_detection']['authenticity_score']:.2%}")
-    print(f"   Is suspicious: {results['tampering_detection']['is_suspicious']}")
-    
-    print(f"\n4. Overall Tampering and related Risks Assessment:")
-    print(f"   Risk score: {results['overall_risk']['risk_score']:.2%}")
-    print(f"   Risk level: {results['overall_risk']['risk_level']}")
-    print(f"   Recommendation: {results['overall_risk']['recommendation']}")
-    print(f"   Risk factors: {', '.join(results['overall_risk']['risk_factors']) if results['overall_risk']['risk_factors'] else 'None'}")
-
-if __name__ == "__main__":
-    demo_clip_engine()

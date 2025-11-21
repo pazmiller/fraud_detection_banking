@@ -1,0 +1,82 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+venv_native/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Data files
+/dataset
+/ocr_results
+/runs
+*.csv
+*.dat
+*.log
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+
+# Model files
+*.pt
+*.pth
+*.ckpt
+*.weights
+*.model
+
+# Environment variables
+.env
+.env.local
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# Machine Learning specific
+models/
+data/
+datasets/
+*.npy
+wandb/
+mlruns/
+
+# OS
+Thumbs.db
