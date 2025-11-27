@@ -2,32 +2,27 @@
 Bank Statement Fraud Detection - ELA + CLIP + Gemini Integration
 Workflow: Image → ELA → CLIP → Gemini Vision → Final Decision
 """
-import sys
 import os
+import sys
+import json
+import time
+import random
+import threading
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
-import threading 
-import random 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.clip_module import BankStatementCLIPEngine
+from src.ela_detection import ela_detect
+from src.llm import GeminiTamperingDetector, GeminiOCRAnalyzer
+from src.ocr_test import extract_text_from_image
+from src.metadata import extract_metadata, check_tampering_indicators
 
 load_dotenv()
-
-sys.path.insert(0, str(Path(__file__).parent / 'clip'))
-sys.path.insert(0, str(Path(__file__).parent / 'ela_detection'))
-sys.path.insert(0, str(Path(__file__).parent / 'llm'))
-sys.path.insert(0, str(Path(__file__).parent / 'ocr_test'))
-sys.path.insert(0, str(Path(__file__).parent / 'metadata'))
-
-from clip_engine import BankStatementCLIPEngine
-from ela_detection.ela import ela_detect
-from llm.gemini1 import GeminiTamperingDetector
-from ocr_test.new_ocr import extract_text_from_image
-from llm.gemini_ocr import GeminiOCRAnalyzer
-from metadata_analysis import extract_metadata, check_tampering_indicators
-import json
-from datetime import datetime
-import time
 
 json_results_store_path = "results_record_flash.json"
 
