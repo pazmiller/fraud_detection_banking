@@ -85,32 +85,27 @@ folder_path = "./your_dataset_folder"
 ```
 FraudDetection/
 ├── src/
-│   ├── __init__.py                 # Package initialization
-│   ├── app.py                      # Main application (multi-threaded)
-│   │
+│   ├── __init__.py                # Package initialization
+│   ├── app.py                     # Main application (multi-threaded)
 │   ├── clip_module/               # CLIP-based verification
 │   │   ├── __init__.py
 │   │   └── clip_engine.py
-│   │
 │   ├── ela_detection/             # Error Level Analysis
 │   │   ├── __init__.py
 │   │   └── ela.py
-│   │
 │   ├── llm/                       # LLM-based analysis
 │   │   ├── __init__.py
 │   │   ├── gemini_vision.py      # Visual tampering detection
 │   │   └── gemini_ocr.py         # Transaction fraud analysis
-│   │
 │   ├── ocr_test/                  # OCR processing
 │   │   ├── __init__.py
 │   │   └── new_ocr.py            # Multi-threaded PaddleOCR
-│   │
 │   └── metadata/                  # Metadata extraction
 │       ├── __init__.py
 │       └── metadata_analysis.py
-│
 ├── dataset/                       # Input images/PDFs
 ├── requirements.txt
+├── .env                          # API keys (not tracked in git)
 └── README.md
 ```
 
