@@ -212,16 +212,15 @@ class FraudDetectionSystem:
                 gemini_result = self._run_gemini(img_path)
                 time.sleep(1.0) 
 
-            # 5. OCR
+            # 5. OCR + Gemini OCR Analysis
             ocr_result = self._run_ocr(img_path) if self.use_ocr else None
-
-            # 6. Gemini OCR Analysis
+            
             gemini_ocr_result = self._run_gemini_ocr(ocr_result) if (self.use_ocr and ocr_result) else None
             
             # Calculate final risk
             final_risk_score = self._calculate_risk(ela_result, clip_result, metadata_result, gemini_result, gemini_ocr_result)
             
-            # Build result
+            # Build result (including fraud recommendation)
             result = {
                 'image_path': img_path,
                 'ela': ela_result,

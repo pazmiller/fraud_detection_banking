@@ -7,12 +7,11 @@ Layer structure:
 2: CLIP (Powered by OpenAI)
 3: ELA
 4: LLM Tampering Vision Analysis (Powered by Gemini)
-5: OCR Extraction
-6: LLM OCR Analysis (Powered by Gemini)
+5: OCR Extraction + LLM OCR Analysis (Powered by Gemini)
 
 # Features
 - **Multi-threaded Processing**: Concurrent with invididual multi-threading OCR processes (4 threads by default)
-- **6-Layer Comprehensive Fraud Detection**: Comprehensive analysis from metadata to transaction-level fraud detection. It is able to achieve more than around 90% accuracy on Gemini-2.5-Pro and around 85% accuracy on Gemini-2.5-Flash
+- **5-Layer Comprehensive Fraud Detection**: Comprehensive analysis from metadata to transaction-level fraud detection. It is able to achieve more than around 90% accuracy on Gemini-2.5-Pro and around 85% accuracy on Gemini-2.5-Flash
 - **Early Termination**: Smart filtering to save time and to skip expensive API calls on obviously fraudulent documents, at Metadata, and CLIP stages.
 - **Batch Processing**: Process multiple documents in paralle
 
@@ -41,7 +40,7 @@ Layer structure:
 - Multi-threaded text extraction with independent engine pool (to avoid tensor memory overflow)
 - Extracts all text content for next stage's LLM transaction analysis
 
-# 6️⃣ **Gemini OCR Analysis** (Google Gemini)
+# **Gemini OCR Analysis** (Google Gemini)
 - Transaction-level fraud pattern detection
 - Identifies suspicious transactions and anomalies
 - Detects unusual patterns (round numbers, duplicate amounts, etc.)
@@ -51,9 +50,6 @@ Layer structure:
 
 The system calculates a combined risk score (0.0 - 1.0) based on all layers:
 
-- **ACCEPT** (`< 0.3`): Low risk, document appears genuine
-- **MANUAL_REVIEW** (`0.3 - 0.6`): Medium risk, requires human verification
-- **REJECT** (`> 0.6`): High risk, likely fraudulent
 
 # Quick Start Prerequisites
 
@@ -109,3 +105,9 @@ Results are saved to `results_record_flash.json` with:
 - Execution time breakdown
 - Batch statistics
 
+## Documen recjection criteria (Fraud Verdict)
+- Final risk score > 0.6
+- Not a bank statement (CLIP)
+- Edited with suspicious software (Metadata)
+- ELA > 30
+- time_different of file creation > 100 seconds
