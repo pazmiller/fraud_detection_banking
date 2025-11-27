@@ -6,11 +6,13 @@ import sys
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import threading 
+import random 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Load environment variables
+
 load_dotenv()
 
-# Add paths
 sys.path.insert(0, str(Path(__file__).parent / 'clip'))
 sys.path.insert(0, str(Path(__file__).parent / 'ela_detection'))
 sys.path.insert(0, str(Path(__file__).parent / 'llm'))
@@ -27,6 +29,7 @@ import json
 from datetime import datetime
 import time
 
+json_results_store_path = "results_record_flash.json"
 
 class FraudDetectionSystem:
     """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (6-Layer Pipeline)"""
@@ -38,8 +41,8 @@ class FraudDetectionSystem:
         self.use_ocr = use_ocr
         self.gemini_vision_time = 0.0
         self.gemini_ocr_time = 0.0
+        self.print_lock = threading.Lock()
         
-        # Initialize Gemini Vision (optional)
         if self.use_gemini:
             try:
                 self.gemini_detector = GeminiTamperingDetector(api_key=gemini_api_key)
@@ -48,8 +51,6 @@ class FraudDetectionSystem:
                 print(f"⚠️  Gemini Vision initialization failed: {e}")
                 print("   Continuing without Gemini Vision...")
                 self.use_gemini = False
-        
-        # Initialize Gemini OCR Analyzer (optional)
         if self.use_ocr and gemini_api_key:
             try:
                 self.gemini_ocr_analyzer = GeminiOCRAnalyzer(api_key=gemini_api_key)
@@ -60,7 +61,7 @@ class FraudDetectionSystem:
                 self.use_ocr = False
     
     def batch_analyze(self, folder_path: str) -> list:
-        """Batch analysis for folder"""
+        """Batch analysis using ThreadPoolExecutor (Max 4 threads)"""
         start_time = time.time()
         self.gemini_vision_time = 0.0
         self.gemini_ocr_time = 0.0
@@ -70,14 +71,64 @@ class FraudDetectionSystem:
             return []
         
         layers = "ELA + CLIP + Metadata + Gemini Vision" + (" + OCR + Gemini OCR" if self.use_ocr else "")
-        print(f"\n{'='*80}\nBatch Analysis: {len(image_paths)} files ({layers})\n{'='*80}\n")
+        print(f"\n{'='*80}\nBatch Analysis (Parallel): {len(image_paths)} files ({layers})\n{'='*80}\n")
         
-        results = [self._analyze_single(img, idx, len(image_paths)) 
-                   for idx, img in enumerate(image_paths, 1)]
+        results = []
+        max_workers = 4 # Depends on CPU threads
         
+        print(f"Starting ThreadPool with {max_workers} workers")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_file = {
+                executor.submit(self._analyze_single_safe_capture, img, idx, len(image_paths)): img 
+                for idx, img in enumerate(image_paths, 1)
+            }
+            for future in as_completed(future_to_file):
+                img_path = future_to_file[future]
+                try:
+                    single_result, _ = future.result() 
+                    results.append(single_result)
+                    
+                except Exception as exc:
+                    with self.print_lock:
+                        print(f'\n❌ {img_path} generated an exception: {exc}')
+                    results.append({'image_path': img_path, 'error': str(exc), 'recommendation': 'REJECT'})
+
+        results.sort(key=lambda x: x['image_path'])
+
         elapsed_time = time.time() - start_time
+        # Total time spend, could be inaccuracies due to multi-threading
         self._print_batch_summary(results, elapsed_time, self.gemini_vision_time, self.gemini_ocr_time)
         return results
+
+    def _analyze_single_safe_capture(self, img_path: str, idx: int, total: int):
+        """
+        Wrapper: Add random delay and perform analysis
+        """
+        sleep_time = random.uniform(0.5, 1.5) # Jitter
+        time.sleep(sleep_time)
+        
+        filename = Path(img_path).name
+        
+        # Thread lock for thread safety
+        with self.print_lock:
+            print(f"\n{'='*80}")
+            print(f"[Thread {threading.current_thread().name}] 🚀 Starting: {filename}")
+            print(f"{'='*80}")
+        
+        try:
+            result = self._analyze_single(img_path, idx, total)
+            with self.print_lock:
+                print(f"\n{'='*80}")
+                print(f"[Thread {threading.current_thread().name}] ✅ Completed: {filename} → {result.get('recommendation', 'UNKNOWN')}")
+                print(f"{'='*80}\n")
+            
+            return result, ""  
+            
+        except Exception as e:
+            with self.print_lock:
+                print(f"\n❌ [Thread {threading.current_thread().name}] ERROR processing {filename}: {e}\n")
+            return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}, ""
     
     def _get_image_paths(self, folder_path: str) -> list:
         """Get all image paths from folder"""
@@ -93,43 +144,85 @@ class FraudDetectionSystem:
         return paths
     
     def _analyze_single(self, img_path: str, idx: int, total: int) -> dict:
-        """Analyze single image"""
-        print(f"\n[{idx}/{total}] {Path(img_path).name}")
+        """Analyze single image (Logic unchanged, output is captured by wrapper)"""
+        # Save the printing to buffer
+        print(f"\n[{idx}/{total}] {Path(img_path).name} (Processing...)")
         
         try:
-            ela_result = self._run_ela(img_path)
-            clip_result = self._run_clip(img_path)
+            # 1. Metadata
+            metadata_result = self._run_metadata(img_path)
+
             
-            # Terminate EARLY: If CLIP detects it's not a bank statement, REJECT immediately
+            # 1.5. Check for high-risk editing software (Early Termination)
+            high_risk_software = ['Photoshop', 'iLovePDF', 'Smallpdf', 'Adobe Illustrator']
+            detected_software = None
+            for flag in metadata_result.get('flags', []):
+                for sw in high_risk_software:
+                    if sw.lower() in flag.lower():
+                        detected_software = sw
+                        break
+                if detected_software:
+                    break
+            
+            if detected_software:
+                print(f"\n  ⚠️  REJECT: High-risk editing software detected: {detected_software}")
+                print(f"  This document was edited with professional software commonly used for forgery.")
+                print(f"  Skipping further analysis - CONFIRMED FRAUDULENT.")
+                result = {
+                    'image_path': img_path,
+                    'ela': {'skipped': True},
+                    'clip': clip_result,
+                    'metadata': metadata_result,
+                    'gemini': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
+                    'ocr': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
+                    'gemini_ocr': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
+                    'final_risk_score': 1.0,
+                    'final_risk_level': 'CRITICAL',
+                    'recommendation': 'REJECT',
+                    'early_termination': True,
+                    'termination_reason': f'Metadata detected high-risk editing software: {detected_software}'
+                }
+                self._print_result(result)
+                return result
+            
+            # 2. CLIP
+            clip_result = self._run_clip(img_path)
             if not clip_result['verification']['is_bank_statement']:
                 print(f"\n  REJECT: Not a bank statement, detected by CLIP, skip.")
                 print(f"Please check if you have submitted the right bank statement. Please report if this is a misjudgement. Thank you!")              
                 result = {
                     'image_path': img_path,
-                    'ela': ela_result,
+                    'ela': {'skipped': True},
                     'clip': clip_result,
-                    'metadata': {'skipped': True, 'reason': 'Not a bank statement'},
+                    'metadata': metadata_result,
                     'gemini': {'skipped': True, 'reason': 'Not a bank statement'},
                     'ocr': {'skipped': True, 'reason': 'Not a bank statement'},
                     'gemini_ocr': {'skipped': True, 'reason': 'Not a bank statement'},
                     'final_risk_score': 1.0,
-                    'final_risk_level': 'HIGH',
+                    'final_risk_level': 'CRITICAL',
                     'recommendation': 'REJECT',
                     'early_termination': True,
                     'termination_reason': 'CLIP detected non-bank statement document'
                 }
-                
                 self._print_result(result)
                 return result
+
+            # 3. ELA
+            ela_result = self._run_ela(img_path)
             
-            # Continue with remaining layers if it's a bank statement
-            metadata_result = self._run_metadata(img_path)
-            gemini_result = self._run_gemini(img_path) if self.use_gemini else None
+            # 4. Gemini Vision (API Call)
+            gemini_result = None
+            if self.use_gemini:
+                gemini_result = self._run_gemini(img_path)
+                time.sleep(1.0) 
+
+            # 5. OCR (Local or API)
             ocr_result = self._run_ocr(img_path) if self.use_ocr else None
+
+            # 6. Gemini OCR Analysis (API Call)
             gemini_ocr_result = self._run_gemini_ocr(ocr_result) if (self.use_ocr and ocr_result) else None
             
             # Calculate final risk
-            '''超1.0 reject, 满分2分'''
             final_risk_score = self._calculate_risk(ela_result, clip_result, metadata_result, gemini_result, gemini_ocr_result)
             
             # Build result
@@ -151,6 +244,8 @@ class FraudDetectionSystem:
             
         except Exception as e:
             print(f"  ❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
             return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}
     
     def _run_ela(self, img_path: str) -> dict:
@@ -175,11 +270,14 @@ class FraudDetectionSystem:
         print(f"\n  [Gemini Vision Analysis]")
         start = time.time()
         result = self.gemini_detector.analyze_tampering(img_path)
-        self.gemini_vision_time += time.time() - start
+        gemini_vision_time = time.time() - start
+        self.gemini_vision_time += gemini_vision_time  # Might not be thread-safe
         print(f"    {result['tampering_detected'] and 'Tampering' or 'Clean'} | "
               f"Confidence: {result['confidence']:.1%} | Risk: {result['risk_level']}")
         if result['findings']:
             print(f"    Findings: {', '.join(result['findings'][:2])}")
+        print(f"    ⏱️  Gemini Vision Time: {gemini_vision_time:.2f}s")
+        result['gemini_vision_time'] = gemini_vision_time
         return result
     
     def _run_metadata(self, img_path: str) -> dict:
@@ -188,9 +286,7 @@ class FraudDetectionSystem:
         try:
             metadata = extract_metadata(img_path)
             flags = check_tampering_indicators(metadata)
-            
-            # Check for key indicators
-            time_diff = metadata.get('file_info', {}).get('time_diff_seconds', 0)
+            time_diff = metadata.get('file_info', {}).get('time_diff_seconds', 0) # Check for key indicators of tampering in Metadata
             has_editing_software = any('editing_software' in flag.lower() for flag in flags)
             
             print(f"    Time Difference: {time_diff}s")
@@ -212,14 +308,16 @@ class FraudDetectionSystem:
         """Run OCR extraction"""
         print(f"\n  [OCR Extraction]")
         try:
+            start = time.time()
             ocr_data = extract_text_from_image(img_path)
-            
-            # Save OCR result to file
+            ocr_time = time.time() - start     
             ocr_dir = Path("ocr_results")
             ocr_dir.mkdir(exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = Path(img_path).stem
-            ocr_file = ocr_dir / f"{filename}_{timestamp}.json"
+
+            rnd_suffix = random.randint(100, 9999) 
+            ocr_file = ocr_dir / f"{filename}_{timestamp}_{rnd_suffix}.json"
             
             with open(ocr_file, 'w', encoding='utf-8') as f:
                 json.dump(ocr_data, f, ensure_ascii=False, indent=2)
@@ -230,16 +328,18 @@ class FraudDetectionSystem:
             print(f"    Total Text Lines: {total_lines}")
             print(f"    Full Text Extracted: {full_text_len:,} characters")
             print(f"    OCR Output saved to: {ocr_file}")
+            print(f"    ⏱️  OCR Extraction Time: {ocr_time:.2f}s")
             
             return {
                 'ocr_data': ocr_data,
                 'ocr_file': str(ocr_file),
                 'total_lines': total_lines,
-                'text_length': full_text_len
+                'text_length': full_text_len,
+                'ocr_time': ocr_time
             }
         except Exception as e:
             print(f"    ❌ OCR failed: {e}")
-            return {'error': str(e)}
+            return {'error': str(e), 'ocr_time': 0.0}
     
     def _run_gemini_ocr(self, ocr_result: dict) -> dict:
         """Run Gemini OCR analysis"""
@@ -253,7 +353,8 @@ class FraudDetectionSystem:
             analysis = self.gemini_ocr_analyzer.analyze_transactions(
                 ocr_result['ocr_file']
             )
-            self.gemini_ocr_time += time.time() - start
+            gemini_ocr_time = time.time() - start
+            self.gemini_ocr_time += gemini_ocr_time
             
             fraud_detected = analysis.get('fraud_detected', False)
             confidence = analysis.get('confidence', 0.0)
@@ -281,7 +382,8 @@ class FraudDetectionSystem:
             else:
                 print(f"      - No unusual patterns")
             
-            print(f"\n    RECOMMENDATION: {analysis.get('recommendation', 'UNKNOWN')}")
+            print(f"\n RECOMMENDATION: {analysis.get('recommendation', 'UNKNOWN')}")
+            print(f"Gemini OCR Time: {gemini_ocr_time:.2f}s")
             
             # Print reason/explanation if fraud detected
             if fraud_detected:
@@ -289,10 +391,11 @@ class FraudDetectionSystem:
                 if explanation:
                     print(f"\n    Reason: {explanation}")
             
+            analysis['gemini_ocr_time'] = gemini_ocr_time
             return analysis
         except Exception as e:
             print(f"    ❌ Gemini OCR analysis failed: {e}")
-            return {'error': str(e)}
+            return {'error': str(e), 'gemini_ocr_time': 0.0}
     
     def _calculate_risk(self, ela_result: dict, clip_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> float:
         """Calculate combined risk score (6-layer)"""
@@ -344,11 +447,16 @@ class FraudDetectionSystem:
         print(f"    {'='*60}")
     
     def _print_batch_summary(self, results: list, elapsed_time: float = None, gemini_vision_time: float = 0.0, gemini_ocr_time: float = 0.0):
-        """Print batch summary with file lists"""
+        """Print batch summary with file lists and timing breakdown"""
         total = len(results)
         accept_files = [Path(r['image_path']).name for r in results if r.get('recommendation') == 'ACCEPT']
         review_files = [Path(r['image_path']).name for r in results if r.get('recommendation') == 'MANUAL_REVIEW']
         reject_files = [Path(r['image_path']).name for r in results if r.get('recommendation') == 'REJECT']
+        
+        # Calculate layer-specific times from individual results
+        ocr_time_total = sum(r.get('ocr', {}).get('ocr_time', 0) for r in results)
+        gemini_vision_time_total = sum(r.get('gemini', {}).get('gemini_vision_time', 0) for r in results if r.get('gemini'))
+        gemini_ocr_time_total = sum(r.get('gemini_ocr', {}).get('gemini_ocr_time', 0) for r in results if r.get('gemini_ocr'))
         
         print(f"\n{'='*80}")
         print("BATCH SUMMARY")
@@ -357,11 +465,14 @@ class FraudDetectionSystem:
             minutes = int(elapsed_time // 60)
             seconds = elapsed_time % 60
             print(f"⏱️  Total Time: {minutes}m {seconds:.2f}s ({elapsed_time:.2f}s)")
-            if gemini_vision_time > 0:
-                print(f"   • Gemini Vision: {gemini_vision_time:.2f}s")
-            if gemini_ocr_time > 0:
-                print(f"   • Gemini OCR: {gemini_ocr_time:.2f}s")
-        print(f"Total: {total} files")
+            print(f"\n   Layer Timing Breakdown:")
+            if ocr_time_total > 0:
+                print(f"   • OCR Extraction: {ocr_time_total:.2f}s ({ocr_time_total/elapsed_time*100:.1f}%)")
+            if gemini_vision_time_total > 0:
+                print(f"   • Gemini Vision: {gemini_vision_time_total:.2f}s ({gemini_vision_time_total/elapsed_time*100:.1f}%)")
+            if gemini_ocr_time_total > 0:
+                print(f"   • Gemini OCR: {gemini_ocr_time_total:.2f}s ({gemini_ocr_time_total/elapsed_time*100:.1f}%)")
+        print(f"\nTotal: {total} files")
         print(f"✅ Accept: {len(accept_files)} ({len(accept_files)/total*100:.1f}%)")
         print(f"⚠️  Manual Review: {len(review_files)} ({len(review_files)/total*100:.1f}%)")
         print(f"❌ Reject: {len(reject_files)} ({len(reject_files)/total*100:.1f}%)")
@@ -384,16 +495,18 @@ class FraudDetectionSystem:
         
         print(f"\n{'='*80}\n")
         
-        # Save results to JSON file
         self._save_results_to_json(accept_files, review_files, reject_files, elapsed_time, total)
     
     def _save_results_to_json(self, accept_files: list, review_files: list, reject_files: list, elapsed_time: float, total: int):
         """Save batch results to JSON file"""
         try:
-            record_file = Path("results_record_flash.json")
+            record_file = Path(json_results_store_path)
             if record_file.exists():
                 with open(record_file, 'r', encoding='utf-8') as f:
-                    all_records = json.load(f)
+                    try:
+                        all_records = json.load(f)
+                    except json.JSONDecodeError:
+                         all_records = []
             else:
                 all_records = []
             
@@ -422,9 +535,7 @@ class FraudDetectionSystem:
 
 
 def main():
-    """Demo usage"""
     overall_start_time = time.time()
-    
     gemini_api_key = os.getenv('GEMINI_API_KEY')
     
     if not gemini_api_key:
@@ -440,7 +551,6 @@ def main():
     
     folder_path = "./dataset"
     # folder_path = "./src/clip/statements"
-    
     results = system.batch_analyze(folder_path)
     
     # Final summary
