@@ -8,7 +8,7 @@ from typing import Dict
 from dotenv import load_dotenv
 
 load_dotenv()
-
+model_of_choice = 'gemini-2.5-pro' 
 
 class GeminiOCRAnalyzer:
     """Use Gemini to analyze OCR-extracted bank statement data for fraud"""
@@ -19,7 +19,7 @@ class GeminiOCRAnalyzer:
             raise ValueError("GEMINI_API_KEY not found")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel(model_of_choice)
         print("[Gemini OCR Analyzer Initialized - Using Gemini 2.5 Pro]")
     
     def analyze_transactions(self, ocr_json_path: str) -> Dict:
@@ -33,19 +33,17 @@ class GeminiOCRAnalyzer:
             Dict with fraud analysis results
         """
         try:
-            # Load OCR data
             with open(ocr_json_path, 'r', encoding='utf-8') as f:
                 ocr_data = json.load(f)
             
             full_text = ocr_data.get('full_text', '')
             
-            # Craft specialized prompt for transaction fraud analysis
             prompt = f"""You are a Compliance Officer responsible for validating bank statement transacttions for fraud detection.
 
 IMPORTANT Guidelines:
 1. Focus on SIGNIFICANT anomalies that clearly indicate fraud
 2. Do NOT flag small calculation discrepancies as fraud unless there's a clear pattern
-3. Consider legitimate banking operations (fees, interest, currency conversion)
+3. Calculate all the data together, do not separate as separation leads to calculation errors
 
 ========== Bank Statement TEXT ==========
 {full_text}
@@ -65,24 +63,28 @@ Focus on:
    - Inconsistent date formats within the statement
    - Clearly altered text patterns
 
-DO NOT flag as fraud:
+
+Things to IGNORE：
 - Minor rounding differences
 - Normal banking fees or charges
 - Standard interest calculations
 - Currency conversion
+- Account names can be unique
+- Subtraction and Addition mistakes, because OCR might not be able to detect negative sign
+- Ignore irect contractions
+- Ignore negative sign issues 
 
 Provide your analysis in this exact format:
 FRAUD_DETECTED: [YES/NO]
-CONFIDENCE: [0-100]%
 RISK_LEVEL: [LOW/MEDIUM/HIGH/CRITICAL]
 
 SUSPICIOUS_TRANSACTIONS:
 - [List ONLY clearly fraudulent transactions, or "None detected"]
 
-PATTERNS_DETECTED:
+Patterns_Detected:
 - [List unusual patterns, or "No unusual patterns"]
 
-RECOMMENDATION: [ACCEPT/MANUAL_REVIEW/REJECT]
+Recommendation: [ACCEPT/MANUAL_REVIEW/REJECT]
 
 Reason: [Provide reason if Fraud Detected: YES]
 """
@@ -93,7 +95,6 @@ Reason: [Provide reason if Fraud Detected: YES]
                 )
             analysis_text = response.text
             
-            # Parse response
             result = self._parse_response(analysis_text, ocr_json_path)
             return result
             
@@ -182,12 +183,10 @@ Reason: [Provide reason if Fraud Detected: YES]
         result['explanation'] = result['explanation'].strip()
         
         # Safety checks to prevent false positives
-        # 1. If confidence is very low, don't recommend REJECT
         if result['confidence'] < 0.3 and result['recommendation'] == 'REJECT':
             result['recommendation'] = 'MANUAL_REVIEW'
             result['risk_level'] = 'MEDIUM' if result['risk_level'] == 'CRITICAL' else result['risk_level']
         
-        # 2. If no findings, force ACCEPT
         if (not result['suspicious_transactions'] and 
             not result['key_findings'] and 
             not result['patterns_detected']):
@@ -195,7 +194,6 @@ Reason: [Provide reason if Fraud Detected: YES]
             result['recommendation'] = 'ACCEPT'
             result['risk_level'] = 'LOW'
         
-        # 3. If fraud_detected is False but recommendation is REJECT, fix inconsistency
         if not result['fraud_detected'] and result['recommendation'] == 'REJECT':
             result['recommendation'] = 'ACCEPT'
         
@@ -205,8 +203,6 @@ Reason: [Provide reason if Fraud Detected: YES]
 def demo():
     """Demo usage"""
     analyzer = GeminiOCRAnalyzer()
-    
-    # Path to OCR output JSON
     ocr_json_path = "./src/ocr_test/ocr_output.json"
     
     if not os.path.exists(ocr_json_path):

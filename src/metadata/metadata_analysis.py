@@ -76,15 +76,13 @@ def check_tampering_indicators(metadata: dict) -> list:
     
     if file_type == 'PDF':
         pdf = metadata.get('pdf_metadata', {})
-        edit_sw = ['Photoshop', 'GIMP', 'Acrobat', 'PDFtk', 'iLovePDF', 'Sejda', 'Smallpdf', 'Adobe Illustrator']
+        edit_sw = ['Photoshop', 'GIMP', 'Acrobat', 'PDFtk', 'iLovePDF', 'PDFium', 'Sejda', 'Smallpdf', 'Adobe Illustrator']
         creator, producer = pdf.get('creator', ''), pdf.get('producer', '')
         
         for sw in edit_sw:
             if sw.lower() in creator.lower() or sw.lower() in producer.lower():
                 flags.append(f'pdf_editing_software: {sw}')
         
-        if creator and producer and creator != producer:
-            flags.append('pdf_converted')
         if pdf.get('creationDate') and pdf.get('modDate') and pdf['creationDate'] != pdf['modDate']:
             flags.append('pdf_modified')
         if not creator and not producer:

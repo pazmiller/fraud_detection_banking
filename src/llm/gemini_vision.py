@@ -6,18 +6,18 @@ from PIL import Image
 import os
 from typing import Dict
 
+model_of_choice = 'gemini-2.5-pro'
 
 class GeminiTamperingDetector:
     """Use Gemini Vision to detect tampering in bank statements"""
     
     def __init__(self, api_key: str = None):
-        # Get API key from environment or parameter
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found. Set it in environment or pass as parameter.")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel(model_of_choice)
         print("[Gemini Vision Initialized]")
     
     def analyze_tampering(self, image_path: str) -> Dict:
@@ -31,16 +31,12 @@ class GeminiTamperingDetector:
             Dict with tampering analysis results
         """
         try:
-            # Gemini supports both images and PDFs natively
             if image_path.lower().endswith('.pdf'):
-                # Upload PDF file directly
                 uploaded_file = genai.upload_file(image_path)
                 file_input = uploaded_file
             else:
-                # Use PIL Image for image files
                 file_input = Image.open(image_path)
             
-            # Craft specialized prompt for tampering detection
             prompt = """
             You are a Compliance Officer responsible for validating bank statements. Your goal is to identify DEFINITIVE evidence of document tampering while ignoring artifacts caused by scanning, printing, or standard PDF generation.
 
@@ -53,9 +49,9 @@ class GeminiTamperingDetector:
                     #ANALYSIS CRITERIA
                     1. Visual Consistency
                     -If the background "noise" or texture suddenly disappears behind specific numbers (indicating a digital patch).
-                    -Look at the empty space SURROUNDING the transaction numbers. Does the texture/noise pattern suddenly
+                    -Look at the empty space SURROUNDING the transaction numbers. Does the texture/noise pattern suddenly.
                     become "flat" or "white" behind a specific number, while the rest of the page has paper grain or digital noise?
-                    - Out of place smudges, ink, irregular colour
+                    -Look for out of place smudges, ink, irregular colour or drawing that should not appear on financial statements.
                     2. Alignment & Layout
                     -If a specific number clearly floats outside its column grid while neighbors are aligned.
                     3. Artifacts & Compression**
@@ -83,7 +79,6 @@ class GeminiTamperingDetector:
                     RECOMMENDATION: [ACCEPT/MANUAL_REVIEW/REJECT]
 """
             
-            # Call Gemini API
             config = { "temperature": 0.1, }
             response = self.model.generate_content(
                 [file_input, prompt],
@@ -91,7 +86,6 @@ class GeminiTamperingDetector:
                 )
             analysis_text = response.text
             
-            # Parse response
             result = self._parse_response(analysis_text, image_path)
             return result
             
@@ -156,18 +150,15 @@ class GeminiTamperingDetector:
                     result['findings'].append(finding)
         
         # Safety checks to prevent false positives
-        # 1. If confidence is low but recommendation is severe, downgrade
         if result['confidence'] < 0.3 and result['recommendation'] == 'REJECT':
             result['recommendation'] = 'MANUAL_REVIEW'
             result['risk_level'] = 'MEDIUM'
         
-        # 2. If no findings detected, force ACCEPT
         if not result['findings'] or all('no tampering' in f.lower() for f in result['findings']):
             result['tampering_detected'] = False
             result['recommendation'] = 'ACCEPT'
             result['risk_level'] = 'LOW'
         
-        # 3. If tampering_detected is False but has severe recommendation, fix inconsistency
         if not result['tampering_detected'] and result['recommendation'] in ['REJECT', 'MANUAL_REVIEW']:
             result['recommendation'] = 'ACCEPT'
         
@@ -176,12 +167,8 @@ class GeminiTamperingDetector:
 
 def demo():
     """Demo usage"""
-    # Set your API key here or in environment
-    api_key = "YOUR_GEMINI_API_KEY"  # Replace with your actual key
-    
+    api_key = "YOUR_GEMINI_API_KEY"
     detector = GeminiTamperingDetector(api_key=api_key)
-    
-    # Test on a sample image
     image_path = "../clip/statements/ocbc_bank_statement.jpg"
     result = detector.analyze_tampering(image_path)
     

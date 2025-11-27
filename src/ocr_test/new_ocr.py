@@ -4,16 +4,70 @@ import json
 import re
 from datetime import datetime
 from typing import List, Dict, Optional
+import threading
 
-# Global OCR instance (singleton pattern)
-_ocr_engine = None
+# Global OCR instances pool for multi-threading (？ for now 4 threads)
+_ocr_pool = []
+_ocr_pool_initialized = False
+_ocr_pool_lock = threading.Lock()
+_parallel_thread_counter = 0
+_parallel_thread_counter_lock = threading.Lock()
+_ocr_semaphore = None
+_ocr_parallel_count = 4  # Match ThreadPoolExecutor max_workers
+
+def initialize_ocr_pool():
+    """Initialize pool of OCR engines for multi-threading"""
+    global _ocr_pool, _ocr_pool_initialized, _ocr_semaphore, _ocr_parallel_count
+    
+    with _ocr_pool_lock:
+        if _ocr_pool_initialized:
+            return
+        
+        print(f"[OCR Pool] Initializing {_ocr_parallel_count} independent OCR engines...")
+        
+        for i in range(_ocr_parallel_count):
+            try:
+                ocr_engine = PaddleOCR(
+                    use_angle_cls=True,
+                    lang='en',
+                    show_log=False,
+                    det_db_box_thresh=0.3,
+                    rec_batch_num=6,
+                    use_space_char=True,
+                    use_gpu=False,
+                    det_limit_side_len=960,
+                    det_limit_type='max'
+                )
+                _ocr_pool.append(ocr_engine)
+                print(f"[OCR Pool] Engine {i+1}/{_ocr_parallel_count} initialized")
+            except Exception as e:
+                print(f"[OCR Pool ERROR] Failed to initialize engine {i+1}: {e}")
+                raise
+        
+        _ocr_semaphore = threading.Semaphore(value=_ocr_parallel_count)
+        _ocr_pool_initialized = True
+        print(f"[OCR Pool] All {_ocr_parallel_count} engines ready!")
+
 
 def get_ocr_engine():
-    """Get or create OCR engine instance"""
-    global _ocr_engine
-    if _ocr_engine is None:
-        _ocr_engine = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-    return _ocr_engine
+    """Get OCR engine from pool (thread-safe allocation)"""
+    global _parallel_thread_counter, _ocr_pool, _ocr_semaphore
+    
+    # Initialize pool on first call
+    if not _ocr_pool_initialized:
+        initialize_ocr_pool()
+    
+    # Thread-safe counter increment and modulo assignment
+    current_thread_counter = 0
+    try:
+        _parallel_thread_counter_lock.acquire()
+        _parallel_thread_counter += 1
+        current_thread_counter = _parallel_thread_counter % _ocr_parallel_count
+    finally:
+        _parallel_thread_counter_lock.release()
+    
+    selected_ocr = _ocr_pool[current_thread_counter]
+    return selected_ocr
 
 
 def extract_text_from_image(image_path: str) -> dict:
@@ -29,7 +83,7 @@ def extract_text_from_image(image_path: str) -> dict:
             'text_lines': [{'text': str, 'confidence': float, 'bbox': list}, ...],
             'transactions': [{'date': str, 'description': str, 'amount': float, 'type': str}, ...],
             'summary': {
-                'total_transactions': int,
+                'total_transactions': float,
                 'total_withdrawals': float,
                 'total_deposits': float,
                 'date_range': {'start': str, 'end': str},
@@ -40,30 +94,64 @@ def extract_text_from_image(image_path: str) -> dict:
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image not found: {image_path}")
     
-    ocr = get_ocr_engine()   
-    result = ocr.ocr(image_path, cls=True)
+    try:
+        ocr = get_ocr_engine()     
+        result = ocr.ocr(image_path, cls=True)
+        
+    except IndexError as e:
+        import traceback
+        print(f"[DEBUG] IndexError details:")
+        print(traceback.format_exc())
+        raise RuntimeError(f"PaddleOCR IndexError: {e}")
+    except Exception as e:
+        import traceback
+        print(f"[DEBUG] Exception details:")
+        print(traceback.format_exc())
+        raise RuntimeError(f"PaddleOCR execution failed: {e}")
+
+    if result is None:
+        raise RuntimeError("PaddleOCR returned None - possible model loading failure")
+    
+    if not isinstance(result, list):
+        raise RuntimeError(f"PaddleOCR returned unexpected type: {type(result)}")
+    
+    if len(result) == 0:
+        raise RuntimeError("PaddleOCR returned empty list - no text detected")
     
     # Extract and structure data
     text_lines = []
     full_text = []
     
-    if result and result[0]:
+    if result[0]:
         for idx, line in enumerate(result[0]):
-            bbox = line[0]
-            text = line[1][0]
-            confidence = line[1][1]
-            
-            # Store structured data
-            line_data = {
-                "line_number": idx + 1,
-                "text": text,
-                "confidence": round(confidence, 4),
-                "bbox": [[int(coord) for coord in point] for point in bbox]
-            }
-            text_lines.append(line_data)
-            full_text.append(text)
+            try:
+                # Validate line structure
+                if not isinstance(line, (list, tuple)) or len(line) < 2:
+                    print(f"Warning: Skipping malformed line {idx}: {line}")
+                    continue
+                
+                bbox = line[0]
+                text_tuple = line[1]
+                
+                if not isinstance(text_tuple, (list, tuple)) or len(text_tuple) < 2:
+                    print(f"Warning: Skipping line {idx} with bad text_tuple: {text_tuple}")
+                    continue
+                
+                text = text_tuple[0]
+                confidence = text_tuple[1]
+                
+                line_data = {
+                    "line_number": idx + 1,
+                    "text": text,
+                    "confidence": round(confidence, 4),
+                    "bbox": [[int(coord) for coord in point] for point in bbox]
+                }
+                text_lines.append(line_data)
+                full_text.append(text)
+            except Exception as e:
+                print(f"Warning: Error processing line {idx}: {e}")
+                continue
     
-    # Parse transactions from full text
     full_text_str = "\n".join(full_text)
     transactions = _parse_transactions(full_text_str)
     summary = _calculate_summary(transactions, full_text_str)
@@ -90,10 +178,8 @@ def _parse_transactions(text: str) -> List[Dict]:
     transactions = []
     lines = text.split('\n')
     
-    # Step 1: Detect column headers and format
     format_info = _detect_statement_format(lines)
     
-    # Common date patterns
     date_patterns = [
         r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b',  # DD/MM/YYYY or MM/DD/YYYY
         r'\b(\d{2}\s+[A-Z]{3}\s+\d{4})\b',        # DD MMM YYYY
@@ -101,7 +187,6 @@ def _parse_transactions(text: str) -> List[Dict]:
         r'\b(\d{4}-\d{2}-\d{2})\b'                # YYYY-MM-DD
     ]
     
-    # Amount patterns (with optional currency symbols)
     amount_pattern = r'[\$€£¥]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
     
     for i, line in enumerate(lines):
@@ -109,11 +194,9 @@ def _parse_transactions(text: str) -> List[Dict]:
         if not line.strip() or len(line.strip()) < 5:
             continue
         
-        # Skip detected header lines
         if i < format_info.get('header_line_index', 0) + 2:
             continue
         
-        # Try to find date
         date_match = None
         for pattern in date_patterns:
             date_match = re.search(pattern, line, re.IGNORECASE)
@@ -123,7 +206,6 @@ def _parse_transactions(text: str) -> List[Dict]:
         if not date_match:
             continue
         
-        # Extract all amounts from the line
         amounts = re.findall(amount_pattern, line)
         clean_amounts = []
         for amt in amounts:
@@ -145,7 +227,6 @@ def _parse_transactions(text: str) -> List[Dict]:
         
         date_str = date_match.group(0)
         
-        # Extract description (text between date and first amount)
         desc_start = date_match.end()
         desc_end = line.find(str(clean_amounts[0]))
         description = line[desc_start:desc_end].strip() if desc_end > desc_start else line[desc_start:].strip()
@@ -393,7 +474,7 @@ def _calculate_summary(transactions: List[Dict], full_text: str) -> Dict:
     return summary
 
 
-''' This is for testing only: So commen out first'''
+''' This is for testing only:'''
 # def main():
 #     """Demo usage - run this file directly to test OCR"""
 #     image_path = "./dataset/ocbc_bank_statement.jpg"
