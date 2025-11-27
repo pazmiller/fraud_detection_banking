@@ -1,4 +1,4 @@
-Bank Statement Fraud Detection System
+# Bank Statement Fraud Detection System
 
 A comprehensive 6-layer fraud detection pipeline to identify tampering, forgery, and fraudulent behavior in bank statements using computer vision, OCR, and large language models.
 
@@ -71,12 +71,13 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ```
 ### Run Analysis
+# python src/app.py to Run the pipeline
 
 # Run batch analysis on dataset folder
-python src/app.py
+default ./dataset folder is used
+Or customize the folder path in src/app.py:
+folder_path = "./your_dataset_folder"
 
-# Or customize the folder path in src/app.py:
-# folder_path = "./your_dataset_folder"
 ```
 
 ## 📁 Project Structure
@@ -84,9 +85,8 @@ python src/app.py
 ```
 FraudDetection/
 ├── src/
-│   ├── __init__.py                 # Package initialisation
-│   ├── app.py                      # Main application 
-│   
+│   ├── __init__.py                 # Package initialization
+│   ├── app.py                      # Main application (multi-threaded)
 │   │
 │   ├── clip_module/               # CLIP-based verification
 │   │   ├── __init__.py
@@ -103,22 +103,18 @@ FraudDetection/
 │   │
 │   ├── ocr_test/                  # OCR processing
 │   │   ├── __init__.py
-│   │   ├── new_ocr.py            # PaddleOCR
-│   │   
+│   │   └── new_ocr.py            # Multi-threaded PaddleOCR
 │   │
 │   └── metadata/                  # Metadata extraction
 │       ├── __init__.py
 │       └── metadata_analysis.py
 │
-├── dataset/                       # Input images/PDFs for putting the bank statements you wish to analyse
-├── ocr_results/                   # OCR output JSON files
-├── results_record_flash.json      # Batch analysis results
+├── dataset/                       # Input images/PDFs
 ├── requirements.txt
 └── README.md
 ```
 
-
-### Threading Configuration Hyperparameters
+## ⚙️ Configuration
 ```python
 # src/app.py
 max_workers = 4  # Number of parallel threads
