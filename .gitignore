@@ -38,7 +38,7 @@ pip-delete-this-directory.txt
 .DS_Store
 
 # Jupyter Notebook
-.ipynb_checkpoints
+.ipynb_checkpointit
 *.ipynb_checkpoints/
 
 # Data files

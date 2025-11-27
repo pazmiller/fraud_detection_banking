@@ -106,7 +106,6 @@ class BankStatementCLIPEngine:
             temp_paths.append(str(temp_path))
         
         doc.close()
-        print(f"    PDF converted: {len(temp_paths)} pages → PNG")
         return temp_paths
     
     def _process_image(self, image_path: str) -> torch.Tensor:

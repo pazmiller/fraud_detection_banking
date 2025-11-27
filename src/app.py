@@ -24,7 +24,9 @@ from src.metadata import extract_metadata, check_tampering_indicators
 
 load_dotenv()
 
-json_results_store_path = "results_record_flash.json"
+results_dir = Path(__file__).parent.parent / "results" # Store json results in results folder
+results_dir.mkdir(exist_ok=True)
+json_results_store_path = results_dir / "results_record.json"
 
 class FraudDetectionSystem:
     """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (6-Layer Pipeline)"""
@@ -146,7 +148,6 @@ class FraudDetectionSystem:
         try:
             # 1. Metadata
             metadata_result = self._run_metadata(img_path)
-
             
             # 1.5. Check for high-risk editing software (Early Termination)
             high_risk_software = ['Photoshop', 'iLovePDF', 'Smallpdf', 'Adobe Illustrator']
@@ -166,7 +167,7 @@ class FraudDetectionSystem:
                 result = {
                     'image_path': img_path,
                     'ela': {'skipped': True},
-                    'clip': clip_result,
+                    'clip': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
                     'metadata': metadata_result,
                     'gemini': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
                     'ocr': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
@@ -205,16 +206,16 @@ class FraudDetectionSystem:
             # 3. ELA
             ela_result = self._run_ela(img_path)
             
-            # 4. Gemini Vision (API Call)
+            # 4. Gemini Vision
             gemini_result = None
             if self.use_gemini:
                 gemini_result = self._run_gemini(img_path)
                 time.sleep(1.0) 
 
-            # 5. OCR (Local or API)
+            # 5. OCR
             ocr_result = self._run_ocr(img_path) if self.use_ocr else None
 
-            # 6. Gemini OCR Analysis (API Call)
+            # 6. Gemini OCR Analysis
             gemini_ocr_result = self._run_gemini_ocr(ocr_result) if (self.use_ocr and ocr_result) else None
             
             # Calculate final risk
@@ -495,7 +496,7 @@ class FraudDetectionSystem:
     def _save_results_to_json(self, accept_files: list, review_files: list, reject_files: list, elapsed_time: float, total: int):
         """Save batch results to JSON file"""
         try:
-            record_file = Path(json_results_store_path)
+            record_file = json_results_store_path
             if record_file.exists():
                 with open(record_file, 'r', encoding='utf-8') as f:
                     try:
