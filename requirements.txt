@@ -1,7 +1,8 @@
 # run: pip install -r requirements.txt for installation
-google-generativeai>=0.3.0
 
-paddleocr>=2.7.0
+google-generativeai>=0.3.0  # Gemini (commented out)
+openai>=1.0.0
+paddleocr>=2.7.0,<3.0.0  # Must be <3.0, v3.x contains bugs that are not yet fixed
 paddlepaddle>=2.5.0  # Use paddlepaddle-gpu for GPU support
 
 # CLIP from GitHub (need to manually innstall but requirement will automatically install for you)
