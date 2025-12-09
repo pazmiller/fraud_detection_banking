@@ -81,7 +81,11 @@ def check_tampering_indicators(metadata: dict) -> list:
         
         for sw in edit_sw:
             if sw.lower() in creator.lower() or sw.lower() in producer.lower():
-                flags.append(f'pdf_editing_software: {sw}')
+                # Mark PDFium separately for lower risk score
+                if sw.lower() == 'pdfium':
+                    flags.append(f'pdf_editing_software_low_risk: {sw}')
+                else:
+                    flags.append(f'pdf_editing_software: {sw}')
         
         if pdf.get('creationDate') and pdf.get('modDate') and pdf['creationDate'] != pdf['modDate']:
             flags.append('pdf_modified')
