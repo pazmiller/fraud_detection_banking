@@ -1,5 +1,5 @@
 """
-Bank Statement Fraud Detection System
+Bank Statement Fraud Detection Pipeline
 """
 
 __version__ = "1.0.0"
