@@ -1,7 +1,8 @@
 """
-Gemini OCR Fraud Analysis - Analyze extracted OCR data for transaction fraud
+OCR Fraud Analysis - Analyze extracted OCR data for transaction fraud
 """
 import google.generativeai as genai
+import openai
 import json
 import os
 from typing import Dict
@@ -11,13 +12,13 @@ load_dotenv()
 model_of_choice = 'gemini-2.5-pro' 
 
 class GeminiOCRAnalyzer:
-    """Use Gemini to analyze OCR-extracted bank statement data for fraud"""
+    """Use OpenAI GPT-5 Nano to analyze OCR-extracted bank statement data for fraud"""
     
     def __init__(self, api_key: str = None):
+        # === GEMINI (COMMENTED OUT) ===
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found")
-        
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(model_of_choice)
         print("[Gemini OCR Analyzer Initialized - Using Gemini 2.5 Pro]")
@@ -38,63 +39,65 @@ class GeminiOCRAnalyzer:
             
             full_text = ocr_data.get('full_text', '')
             
-            prompt = f"""You are a Compliance Officer responsible for validating bank statement transacttions for fraud detection.
+            prompt = f"""
+You are a Senior Compliance Officer specializing in reviewing **raw, noisy OCR-scanned bank statements**.
 
-IMPORTANT Guidelines:
-1. Focus on SIGNIFICANT anomalies that clearly indicate fraud
-2. Do NOT flag small calculation discrepancies as fraud unless there's a clear pattern
-3. Calculate all the data together, do not separate as separation leads to calculation errors
+<CONTEXT>
+The input text comes from an OCR (Optical Character Recognition) engine. 
+**CRITICAL ASSUMPTION:** The OCR engine frequently fails to capture:
+1. Negative signs (e.g., "500.00" is read instead of "-500.00").
+2. Column alignment (Debits and Credits may be merged).
+3. Exact arithmetic precision (minor rounding errors occur).
 
-========== Bank Statement TEXT ==========
-{full_text}
+These issues are **TECHNICAL LIMITATIONS**, not evidence of fraud. You must mentally auto-correct these OCR artifacts before evaluating risk.
+</CONTEXT>
 
-Focus on:
+<GOAL>
+Identify **INTENTIONAL MANIPULATION** or **MATERIAL FRAUD**. Do not report OCR noise.
+</GOAL>
 
-1. **Major Transaction Anomalies**:
-   - Duplicate large transactions (same amount, same merchant, same day)
-   - Impossible transaction sequences (e.g., balance going negative when overdraft not allowed)
-   - Clearly fabricated transaction descriptions
+<INSTRUCTIONS>
+Perform the analysis in two mental steps:
+1. **Normalization:** Mentally correct missing negative signs based on the context (e.g., if Balance decreases, treat the transaction as a debit, even if the '-' is missing).
+2. **Evaluation:** Apply fraud logic ONLY to the normalized data.
 
-2. **Significant Numerical Issues**:
-   - Balance calculation errors >2%
-   - Numerical incorrect patterns
+**MARK AS FRAUD ONLY IF:**
+* **Impossible Logic:** Balance increases but no credit transaction occurred (and cannot be explained by OCR column shift).
+* **Text Alteration:** Specific evidence of cut-and-paste text (e.g., different font descriptions noted in text).
+* **Duplicate Clusters:** Large identical transactions (> $1000) to the same beneficiary on the same day.
+* **Critical Math Failure:** Balance calculation is off by **>5%** (ignoring sign direction).
+* **The name of the bank does not exist in real world**.
 
-3. **Obvious Formatting Issues**:
-   - Inconsistent date formats within the statement
-   - Clearly altered text patterns
+**STRICTLY IGNORE (DO NOT FLAG):**
+* Missing negative signs (Treat "100 - 50 = 50" and "100 50 50" as valid).
+* Arithmetic errors smaller than 5%.
+* Dates in the future (Assume they are statement closing dates or system glitches).
+* Confusion between Credit/Debit columns.
+</INSTRUCTIONS>
 
+Bank Statement TEXT:
+"{full_text}"
 
-Things to IGNORE：
-- Minor rounding differences
-- Normal banking fees or charges
-- Standard interest calculations
-- Currency conversion
-- Account names can be unique
-- Subtraction and Addition mistakes, because OCR might not be able to detect negative sign
-- Ignore irect contractions
-- Ignore negative sign issues 
+--------------------------------------------------
+Output your analysis in this format:
 
-Provide your analysis in this exact format:
 FRAUD_DETECTED: [YES/NO]
 RISK_LEVEL: [LOW/MEDIUM/HIGH/CRITICAL]
 
-SUSPICIOUS_TRANSACTIONS:
-- [List ONLY clearly fraudulent transactions, or "None detected"]
+ANALYSIS_LOGIC:
+[Briefly explain how you handled OCR errors. E.g., "Noted missing negative signs on debits, corrected logic implies valid balance."]
 
-Patterns_Detected:
-- [List unusual patterns, or "No unusual patterns"]
+SUSPICIOUS_TRANSACTIONS:
+- [List ONLY if it passes the >5% error threshold or shows clear manipulation. If strictly OCR noise, write "None detected"]
 
 Recommendation: [ACCEPT/MANUAL_REVIEW/REJECT]
-
-Reason: [Provide reason if Fraud Detected: YES]
 """
-            config = { "temperature": 0.1, }
+            config = { "temperature": 0.0, }
             response = self.model.generate_content(
                 prompt,
                 generation_config=config
-                )
-            analysis_text = response.text
-            
+            )
+            analysis_text = response.text         
             result = self._parse_response(analysis_text, ocr_json_path)
             return result
             

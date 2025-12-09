@@ -26,12 +26,12 @@ load_dotenv()
 
 results_dir = Path(__file__).parent.parent / "results" # Store json results in results folder
 results_dir.mkdir(exist_ok=True)
-json_results_store_path = results_dir / "results_record.json"
+json_results_store_path = results_dir / "results_record_Gemini-2.5-pro.json"
 
 class FraudDetectionSystem:
-    """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (6-Layer Pipeline)"""
+    """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (5-Layer Pipeline)"""
     
-    def __init__(self, ela_threshold=30.0, use_gemini=True, use_ocr=True, gemini_api_key=None):
+    def __init__(self, ela_threshold=30.0, use_gemini=True, use_ocr=True):
         self.clip_engine = BankStatementCLIPEngine()
         self.ela_threshold = ela_threshold
         self.use_gemini = use_gemini
@@ -40,21 +40,22 @@ class FraudDetectionSystem:
         self.gemini_ocr_time = 0.0
         self.print_lock = threading.Lock()
         
+        # Initialize Vision analyzer (uses OPENROUTER_API_KEY from env)
         if self.use_gemini:
             try:
-                self.gemini_detector = GeminiTamperingDetector(api_key=gemini_api_key)
-                print("[Gemini Vision enabled for enhanced tampering detection]")
+                self.gemini_detector = GeminiTamperingDetector()
+                print("[Vision Analysis enabled]")
             except Exception as e:
-                print(f"⚠️  Gemini Vision initialization failed: {e}")
-                print("   Continuing without Gemini Vision...")
+                print(f"⚠️  Vision initialization failed: {e}")
                 self.use_gemini = False
-        if self.use_ocr and gemini_api_key:
+        
+        # Initialize OCR analyzer (uses OPENROUTER_API_KEY from env)
+        if self.use_ocr:
             try:
-                self.gemini_ocr_analyzer = GeminiOCRAnalyzer(api_key=gemini_api_key)
-                print("[OCR + Gemini OCR Analysis enabled]")
+                self.gemini_ocr_analyzer = GeminiOCRAnalyzer()
+                print("[OCR + LLM Analysis enabled]")
             except Exception as e:
-                print(f"⚠️  Gemini OCR initialization failed: {e}")
-                print("   Continuing without OCR analysis...")
+                print(f"⚠️  OCR Analyzer initialization failed: {e}")
                 self.use_ocr = False
     
     def batch_analyze(self, folder_path: str) -> list:
@@ -183,7 +184,7 @@ class FraudDetectionSystem:
             
             # 2. CLIP
             clip_result = self._run_clip(img_path)
-            if not clip_result['verification']['is_bank_statement']:
+            if not clip_result['is_bank_statement']:
                 print(f"\n  REJECT: Not a bank statement, detected by CLIP, skip.")
                 print(f"Please check if you have submitted the right bank statement. Please report if this is a misjudgement. Thank you!")              
                 result = {
@@ -215,10 +216,10 @@ class FraudDetectionSystem:
             # 5. OCR + Gemini OCR Analysis
             ocr_result = self._run_ocr(img_path) if self.use_ocr else None
             
-            gemini_ocr_result = self._run_gemini_ocr(ocr_result) if (self.use_ocr and ocr_result) else None
+            gemini_ocr_result = self._run_gemini_ocr(ocr_result, Path(img_path).name) if (self.use_ocr and ocr_result) else None
             
             # Calculate final risk
-            final_risk_score = self._calculate_risk(ela_result, clip_result, metadata_result, gemini_result, gemini_ocr_result)
+            final_risk_score, calc_steps = self._calculate_risk(ela_result, clip_result, metadata_result, gemini_result, gemini_ocr_result)
             
             # Build result (including fraud recommendation)
             result = {
@@ -229,9 +230,10 @@ class FraudDetectionSystem:
                 'gemini': gemini_result,
                 'ocr': ocr_result,
                 'gemini_ocr': gemini_ocr_result,
+                'risk_calculation_steps': calc_steps,
                 'final_risk_score': final_risk_score,
-                'final_risk_level': 'HIGH' if final_risk_score > 0.6 else 'MEDIUM' if final_risk_score > 0.3 else 'LOW',
-                'recommendation': 'REJECT' if final_risk_score > 0.6 else 'MANUAL_REVIEW' if final_risk_score > 0.3 else 'ACCEPT'
+                'final_risk_level': 'HIGH' if final_risk_score > 0.6 else 'MEDIUM' if final_risk_score >= 0.3 else 'LOW',
+                'recommendation': 'REJECT' if final_risk_score > 0.6 else 'MANUAL_REVIEW' if final_risk_score >= 0.3 else 'ACCEPT'
             }
             
             self._print_result(result)
@@ -244,9 +246,9 @@ class FraudDetectionSystem:
             return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}
     
     def _run_ela(self, img_path: str) -> dict:
-        """Run ELA detection (skip for PDF)"""
-        if img_path.lower().endswith('.pdf'):
-            print(f"\n  [ELA Detection - SKIPPED for PDF]")
+        """Run ELA detection (skip for PDF and PNG)"""
+        if img_path.lower().endswith('.pdf') or img_path.lower().endswith('.PDF') or img_path.lower().endswith('.png'):
+            print(f"\n  [ELA Detection - SKIPPED for PDF and PNG]")
             return {'verdict': 'SKIPPED', 'is_suspicious': False, 'max_difference': 0.0, 'skipped': True}
         
         print(f"\n  [ELA Detection]")
@@ -256,9 +258,13 @@ class FraudDetectionSystem:
         return result
     
     def _run_clip(self, img_path: str) -> dict:
-        """Run CLIP analysis"""
-        print(f"\n  [CLIP Analysis]")
-        return self.clip_engine.comprehensive_analysis(img_path, debug=False)
+        """Run CLIP document type classification"""
+        print(f"\n  [CLIP Document Classification]")
+        result = self.clip_engine.classify_document(img_path)
+        print(f"    Predicted Type: {result['predicted_type']}")
+        print(f"    Is Bank Statement: {result['is_bank_statement']}")
+        print(f"    Confidence: {result['confidence']:.1%}")
+        return result
     
     def _run_gemini(self, img_path: str) -> dict:
         """Run Gemini vision analysis"""
@@ -270,7 +276,7 @@ class FraudDetectionSystem:
         print(f"    {result['tampering_detected'] and 'Tampering' or 'Clean'} | "
               f"Confidence: {result['confidence']:.1%} | Risk: {result['risk_level']}")
         if result['findings']:
-            print(f"    Findings: {', '.join(result['findings'][:2])}")
+            print(f"    Vision {img_path} Findings: {', '.join(result['findings'][:2])}")
         print(f"    ⏱️  Gemini Vision Time: {gemini_vision_time:.2f}s")
         result['gemini_vision_time'] = gemini_vision_time
         return result
@@ -285,7 +291,12 @@ class FraudDetectionSystem:
             has_editing_software = any('editing_software' in flag.lower() for flag in flags)
             
             print(f"    Time Difference: {time_diff}s")
-            print(f"    Editing Software Detected: {has_editing_software}")
+            # Show which editing software was detected
+            editing_sw_flags = [f for f in flags if 'editing_software' in f.lower()]
+            if editing_sw_flags:
+                print(f"    Editing Software Detected: {editing_sw_flags}")
+            else:
+                print(f"    Editing Software Detected: False")
             if flags:
                 print(f"    Flags: {', '.join(flags[:3])}")
             
@@ -336,9 +347,9 @@ class FraudDetectionSystem:
             print(f"    ❌ OCR failed: {e}")
             return {'error': str(e), 'ocr_time': 0.0}
     
-    def _run_gemini_ocr(self, ocr_result: dict) -> dict:
+    def _run_gemini_ocr(self, ocr_result: dict, filename: str = "") -> dict:
         """Run Gemini OCR analysis"""
-        print(f"\n  [Gemini OCR Analysis]")
+        print(f"\n  [Gemini OCR Analysis] -" if filename else "\n  [Gemini OCR Analysis]")
         try:
             if 'error' in ocr_result:
                 print(f"    Skipped (OCR failed)")
@@ -355,7 +366,7 @@ class FraudDetectionSystem:
             confidence = analysis.get('confidence', 0.0)
             risk_level = analysis.get('risk_level', 'UNKNOWN')
             
-            print(f"    FRAUD_DETECTED: {fraud_detected and 'YES' or 'NO'}")
+            print(f"    OCR FRAUD_DETECTED{filename}: {fraud_detected and 'YES' or 'NO'}")
             print(f"    CONFIDENCE: {confidence:.1%}")
             print(f"    RISK_LEVEL: {risk_level}")
             
@@ -392,50 +403,83 @@ class FraudDetectionSystem:
             print(f"    ❌ Gemini OCR analysis failed: {e}")
             return {'error': str(e), 'gemini_ocr_time': 0.0}
     
-    def _calculate_risk(self, ela_result: dict, clip_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> float:
-        """Calculate combined risk score (6-layer)"""
-        risk = clip_result['overall_risk']['risk_score']
+    def _calculate_risk(self, ela_result: dict, clip_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> tuple:
+        """Calculate combined risk score (4-layer) with detailed breakdown"""
+        contributions = {}
+        risk = 0.0
         
-        # ELA  (skipped if PDF)
+        # ELA (skipped if PDF)
+        ela_contribution = 0.0
         if not ela_result.get('skipped', False) and ela_result['is_suspicious']:
-            risk = min(risk + 0.15, 1.0)
-        
-        # CLIP tampering
-        if clip_result['tampering_detection']['tampering_risk_score'] > 0.3:
-            risk = max(risk, 0.3)
+            ela_contribution = 0.15
+            risk = min(risk + ela_contribution, 1.0)
+        contributions['ELA'] = ela_contribution
         
         # Metadata Analysis
+        metadata_contribution = 0.0
         if metadata_result and 'error' not in metadata_result:
-            # Time difference between created and modified > 100 seconds
-            time_diff = metadata_result.get('time_diff_seconds', 0)
-            if time_diff > 100:
+            time_diff = metadata_result.get('time_diff_seconds', 0)            
+            if time_diff > 500:
+                metadata_contribution += 0.3
+                risk = min(risk + 0.3, 1.0)
+            elif time_diff > 100:
+                metadata_contribution += 0.2
                 risk = min(risk + 0.2, 1.0)
             
-            # Editing software detected
             if metadata_result.get('editing_software_detected', False):
-                risk = min(risk + 0.3, 1.0)
+                # Check if it's PDFium (lower risk) or other editing software
+                flags = metadata_result.get('flags', [])
+                is_pdfium_only = any('pdf_editing_software_low_risk' in f for f in flags) and \
+                                 not any('pdf_editing_software:' in f for f in flags)
+                if is_pdfium_only:
+                    metadata_contribution += 0.3
+                    risk = min(risk + 0.3, 1.0)
+                else:
+                    metadata_contribution += 0.3
+                    risk = min(risk + 0.3, 1.0)
+        contributions['Metadata'] = metadata_contribution
         
         # Gemini Vision
+        gemini_contribution = 0.0
         if gemini_result:
             if gemini_result['tampering_detected']:
-                risk = min(risk + gemini_result['confidence'] * 0.3, 1.0)
+                gemini_contribution += 0.3
+                risk = min(risk + 0.3, 1.0)
+            
             if gemini_result['recommendation'] == 'REJECT':
+                old_risk = risk
                 risk = max(risk, 0.6)
-        
+                gemini_contribution += (risk - old_risk)
+        contributions['Gemini Vision'] = gemini_contribution
+
         # OCR + Gemini OCR - Transaction Analysis
+        ocr_contribution = 0.0
         if gemini_ocr_result and 'error' not in gemini_ocr_result:
             if gemini_ocr_result.get('fraud_detected'):
-                ocr_confidence = gemini_ocr_result.get('confidence', 0.5)
-                risk = min(risk + ocr_confidence * 0.4, 1.0)
+                ocr_contribution += 0.3
+                risk = min(risk + 0.3, 1.0)
+            
             if gemini_ocr_result.get('recommendation') == 'REJECT':
+                old_risk = risk
                 risk = max(risk, 0.7)
+                ocr_contribution += (risk - old_risk)
+        contributions['Gemini OCR'] = ocr_contribution
         
-        return risk
+        contributions['TOTAL'] = risk
+        
+        return risk, contributions
     
     def _print_result(self, result: dict):
-        """Print analysis result"""
-        layers = 6 if self.use_ocr else 4
-        print(f"\n  [Combined Result ({layers}-Layer Analysis)]")
+        """Print analysis result with risk calculation breakdown"""
+        layers = 5
+        filename = Path(result.get('image_path', 'Unknown')).name
+        print(f"\n  [Combined Result ({layers}-Layer Analysis)] - {filename}")
+        
+        # Print risk calculation breakdown
+        contributions = result.get('risk_calculation_steps', {})
+        if contributions:
+            print(f"    Risk Breakdown: ELA: {contributions.get('ELA', 0):.2f} | Metadata: {contributions.get('Metadata', 0):.2f} | Gemini Vision: {contributions.get('Gemini Vision', 0):.2f} | Gemini OCR: {contributions.get('Gemini OCR', 0):.2f}")
+        
         print(f"    Final Risk Score: {result['final_risk_score']:.2f}")
         print(f"    Final Risk Level: {result['final_risk_level']}")
         print(f"    Recommendation: {result['recommendation']}")
@@ -516,7 +560,8 @@ class FraudDetectionSystem:
                 },
                 "accepted_files": accept_files,
                 "manual_review_files": review_files,
-                "rejected_files": reject_files
+                "rejected_files": reject_files,
+                "manual_review_files + rejected_files": review_files + reject_files
             }
             
             all_records.append(new_record)
@@ -531,17 +576,12 @@ class FraudDetectionSystem:
 
 def main():
     overall_start_time = time.time()
-    gemini_api_key = os.getenv('GEMINI_API_KEY')
-    
-    if not gemini_api_key:
-        print("⚠️  GEMINI_API_KEY not found in .env file")
-        print("   Set use_gemini=False or add GEMINI_API_KEY to .env")
     
     # Initialise system with full 6-layer pipeline (specific ones can be disabled by = False)
+    # API keys are loaded from environment variables in each module
     system = FraudDetectionSystem(
         use_gemini=True, 
-        use_ocr=True, 
-        gemini_api_key=gemini_api_key
+        use_ocr=True
     )
     
     folder_path = "./dataset"

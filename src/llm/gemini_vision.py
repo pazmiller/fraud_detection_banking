@@ -1,21 +1,25 @@
 """
-Gemini Vision API for Bank Statement Tampering Detection
+Vision API for Bank Statement Tampering Detection
 """
 import google.generativeai as genai
+import openai
+import base64
 from PIL import Image
 import os
 from typing import Dict
+from dotenv import load_dotenv
+  # or 'google/gemma-3-27b-it:free'
 
+load_dotenv()
 model_of_choice = 'gemini-2.5-pro'
 
 class GeminiTamperingDetector:
-    """Use Gemini Vision to detect tampering in bank statements"""
+    """Use OpenAI GPT-5 Nano Vision to detect tampering in bank statements"""
     
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found. Set it in environment or pass as parameter.")
-        
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(model_of_choice)
         print("[Gemini Vision Initialized]")
@@ -31,11 +35,20 @@ class GeminiTamperingDetector:
             Dict with tampering analysis results
         """
         try:
+            # === GEMINI (COMMENTED OUT) ===
             if image_path.lower().endswith('.pdf'):
                 uploaded_file = genai.upload_file(image_path)
                 file_input = uploaded_file
             else:
                 file_input = Image.open(image_path)
+
+            # Determine image type
+            if image_path.lower().endswith('.png'):
+                media_type = "image/png"
+            elif image_path.lower().endswith('.pdf'):
+                media_type = "image/png"  # Converted from PDF
+            else:
+                media_type = "image/jpeg"
             
             prompt = """
             You are a Compliance Officer responsible for validating bank statements. Your goal is to identify DEFINITIVE evidence of document tampering while ignoring artifacts caused by scanning, printing, or standard PDF generation.
@@ -52,6 +65,7 @@ class GeminiTamperingDetector:
                     -Look at the empty space SURROUNDING the transaction numbers. Does the texture/noise pattern suddenly.
                     become "flat" or "white" behind a specific number, while the rest of the page has paper grain or digital noise?
                     -Look for out of place smudges, ink, irregular colour or drawing that should not appear on financial statements.
+                    -Look for indicators of tampering and eidting such as Adobe
                     2. Alignment & Layout
                     -If a specific number clearly floats outside its column grid while neighbors are aligned.
                     3. Artifacts & Compression**
@@ -78,14 +92,14 @@ class GeminiTamperingDetector:
 
                     RECOMMENDATION: [ACCEPT/MANUAL_REVIEW/REJECT]
 """
-            
             config = { "temperature": 0.1, }
             response = self.model.generate_content(
                 [file_input, prompt],
                 generation_config=config
-                )
+            )
             analysis_text = response.text
             
+            # Results
             result = self._parse_response(analysis_text, image_path)
             return result
             
