@@ -31,7 +31,8 @@ def initialize_ocr_pool():
                     use_angle_cls=True,
                     lang='en',
                     show_log=False,
-                    det_db_box_thresh=0.3,
+                    det_db_box_thresh=0.2,  # Lower threshold to detect small symbols like +, -, =
+                    det_db_unclip_ratio=1.8,  # Expand text detection boxes slightly
                     rec_batch_num=6,
                     use_space_char=True,
                     use_gpu=False,
@@ -52,8 +53,7 @@ def initialize_ocr_pool():
 def get_ocr_engine():
     """Get OCR engine from pool (thread-safe allocation)"""
     global _parallel_thread_counter, _ocr_pool, _ocr_semaphore
-    
-    # Initialize pool on first call
+
     if not _ocr_pool_initialized:
         initialize_ocr_pool()
     
@@ -190,8 +190,8 @@ def _parse_transactions(text: str) -> List[Dict]:
     amount_pattern = r'[\$€£¥]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
     
     for i, line in enumerate(lines):
-        # Skip empty, header, or very short lines
-        if not line.strip() or len(line.strip()) < 5:
+        # Skip empty, header, or very short lines (1 char cases)
+        if not line.strip() or len(line.strip()) < 2:
             continue
         
         if i < format_info.get('header_line_index', 0) + 2:
@@ -218,7 +218,6 @@ def _parse_transactions(text: str) -> List[Dict]:
         if not clean_amounts:
             continue
         
-        # Use format_info to classify transaction
         trans_info = _classify_transaction(
             line, 
             clean_amounts, 
@@ -262,12 +261,12 @@ def _detect_statement_format(lines: List[str]) -> Dict:
     }
     
     # Keywords for different column types
-    withdrawal_keywords = ['withdraw', 'debit', 'out', 'payment', 'dr', '支出']
-    deposit_keywords = ['deposit', 'credit', 'in', 'receipt', 'cr', '存入']
-    amount_keywords = ['amount', 'value', 'sum', '金额']
-    balance_keywords = ['balance', 'running', 'current', '余额', '结存']
-    date_keywords = ['date', 'transaction date', 'posting date', '日期']
-    desc_keywords = ['description', 'particulars', 'details', 'narration', '说明', '摘要']
+    withdrawal_keywords = ['withdraw', 'debit', 'out', 'payment', 'dr']
+    deposit_keywords = ['deposit', 'credit', 'in', 'receipt', 'cr']
+    amount_keywords = ['amount', 'value', 'sum']
+    balance_keywords = ['balance', 'running', 'current']
+    date_keywords = ['date', 'transaction date', 'posting date']
+    desc_keywords = ['description', 'particulars', 'details', 'narration']
     
     # Scan first 20 lines for headers
     for i, line in enumerate(lines[:20]):
@@ -285,7 +284,6 @@ def _detect_statement_format(lines: List[str]) -> Dict:
         
         match_count = sum(keyword_matches.values())
         
-        # If 3+ column headers found, likely a header line
         if match_count >= 3:
             format_info['header_line_index'] = i
             
@@ -348,9 +346,7 @@ def _classify_transaction(line: str, amounts: List[float], format_info: Dict) ->
             elif amounts[1] > 0 and amounts[0] == 0:
                 result['type'] = 'deposit'
                 result['amount'] = amounts[1]
-        # If only one amount, check position or context
         elif len(amounts) == 1:
-            # Use keyword analysis as fallback
             result['type'] = _infer_from_keywords(line_lower)
     
     elif format_type == 'single_column':
@@ -508,4 +504,3 @@ def _calculate_summary(transactions: List[Dict], full_text: str) -> Dict:
 
 # if __name__ == "__main__":
 #     main()
-
