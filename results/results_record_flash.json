@@ -1,0 +1,608 @@
+[
+  {
+    "timestamp": "2025-11-25 18:26:29",
+    "total_files": 15,
+    "elapsed_time_seconds": 386.64,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-25 18:49:56",
+    "total_files": 15,
+    "elapsed_time_seconds": 399.32,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-25 19:12:33",
+    "total_files": 16,
+    "elapsed_time_seconds": 417.8,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-25 19:55:03",
+    "total_files": 16,
+    "elapsed_time_seconds": 426.56,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-25 21:22:00",
+    "total_files": 16,
+    "elapsed_time_seconds": 368.23,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 10:18:15",
+    "total_files": 16,
+    "elapsed_time_seconds": 317.32,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 10:54:45",
+    "total_files": 16,
+    "elapsed_time_seconds": 375.33,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 11:10:07",
+    "total_files": 16,
+    "elapsed_time_seconds": 455.23,
+    "summary": {
+      "accept_count": 5,
+      "review_count": 9,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 11:24:05",
+    "total_files": 16,
+    "elapsed_time_seconds": 477.6,
+    "summary": {
+      "accept_count": 7,
+      "review_count": 7,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 11:41:42",
+    "total_files": 16,
+    "elapsed_time_seconds": 737.16,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 14:00:05",
+    "total_files": 16,
+    "elapsed_time_seconds": 698.48,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 14:09:39",
+    "total_files": 16,
+    "elapsed_time_seconds": 318.89,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "bank_statement_problem4.png",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 16:01:23",
+    "total_files": 16,
+    "elapsed_time_seconds": 283.92,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 16:38:46",
+    "total_files": 16,
+    "elapsed_time_seconds": 299.0,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-26 19:15:14",
+    "total_files": 16,
+    "elapsed_time_seconds": 252.18,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-27 14:43:27",
+    "total_files": 16,
+    "elapsed_time_seconds": 566.0,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-27 15:00:30",
+    "total_files": 16,
+    "elapsed_time_seconds": 726.14,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-27 15:08:46",
+    "total_files": 16,
+    "elapsed_time_seconds": 254.82,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 7,
+      "reject_count": 3
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  },
+  {
+    "timestamp": "2025-11-27 19:07:56",
+    "total_files": 16,
+    "elapsed_time_seconds": 761.55,
+    "summary": {
+      "accept_count": 6,
+      "review_count": 8,
+      "reject_count": 2
+    },
+    "accepted_files": [
+      "OCBC.pdf",
+      "Statements_for_01_February_2024_to_29_February_2024.PDF",
+      "Statements_for_01_March_2024_to_31_March_2024.pdf",
+      "Statements_for_01_May_2024_to_31_May_New.pdf",
+      "bank_statement_NoProblem.png",
+      "ocbc_bank_statement.jpg"
+    ],
+    "manual_review_files": [
+      "OCBC2_(oneless).pdf",
+      "Statements_for_01_April_2024_to_30_April_2024_251118_134407.pdf",
+      "Statements_for_01_August_(add).pdf",
+      "bank_statement_problem2.png",
+      "bank_statement_problem3.png",
+      "bank_statement_problem4.png",
+      "ocbc_bank_statement_(ela).jpg",
+      "ocbc_bank_statement_(ps).jpg"
+    ],
+    "rejected_files": [
+      "Statements_for_01_April_(white).pdf",
+      "note.pdf"
+    ]
+  }
+]
