@@ -26,9 +26,9 @@ class BankStatementCLIPEngine:
     def __init__(self, config: Optional[CLIPConfig] = None):
         self.config = config or CLIPConfig()
         self.device = self.config.device
-        print(f"[Loading CLIP Model]{self.config.model_name} to {self.device}...")
+        # print(f"[Loading CLIP Model]{self.config.model_name} to {self.device}...")
         self.model, self.preprocess = clip.load(self.config.model_name, device=self.device)
-        print("[Loading Successful]")
+        # print("[Loading Successful]")
             
         self._setup_text_prompts()
     
@@ -43,12 +43,12 @@ class BankStatementCLIPEngine:
         self._encode_text_prompts()
 
     def _encode_text_prompts(self):
-        print("[Encoding text prompts...]")
+        # print("[Encoding text prompts...]")
         text_tokens = clip.tokenize(self.document_type_prompts).to(self.device)
         with torch.no_grad():
             self.text_features = self.model.encode_text(text_tokens)
             self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-        print("[Text prompts encoding successful]")
+        # print("[Text prompts encoding successful]")
         
     def _convert_pdf_to_image(self, pdf_path: str) -> List[str]:
         """Convert PDF first page to temporary PNG image"""
