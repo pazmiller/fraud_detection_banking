@@ -2,7 +2,6 @@
 OCR Fraud Analysis - Analyze extracted OCR data for transaction fraud
 """
 import google.generativeai as genai
-import openai
 import json
 import os
 from typing import Dict
@@ -21,7 +20,7 @@ class GeminiOCRAnalyzer:
             raise ValueError("GEMINI_API_KEY not found")
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(model_of_choice)
-        print("[Gemini OCR Analyzer Initialized - Using Gemini 2.5 Pro]")
+        # print("[Gemini OCR Analyzer Initialized - Using Gemini 2.5 Pro]")
     
     def analyze_transactions(self, ocr_json_path: str) -> Dict:
         """

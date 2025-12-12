@@ -2,6 +2,18 @@
 Bank Statement Fraud Detection - ELA + CLIP + Gemini Integration
 Workflow: Image → ELA → CLIP → Gemini Vision → Final Decision
 """
+import warnings
+# Suppress Google API Python version warnings
+warnings.filterwarnings('ignore', message='.*Python version.*past its end of life.*')
+warnings.filterwarnings('ignore', category=FutureWarning, module='google.api_core')
+
+# Fix for Python 3.9: packages_distributions not available
+import importlib.metadata
+if not hasattr(importlib.metadata, 'packages_distributions'):
+    def _packages_distributions():
+        return {}
+    importlib.metadata.packages_distributions = _packages_distributions
+
 import os
 import sys
 import json
@@ -31,29 +43,38 @@ json_results_store_path = results_dir / "results_record_Gemini-2.5-pro.json"
 class FraudDetectionSystem:
     """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (5-Layer Pipeline)"""
     
-    def __init__(self, ela_threshold=30.0, use_gemini=True, use_ocr=True):
+    def __init__(self, ela_threshold=30.0, use_gemini=True, use_ocr=True, verbose=True, summary_type='simple'):
+        """
+        Args:
+            ela_threshold: ELA detection threshold
+            use_gemini: Enable Gemini Vision analysis
+            use_ocr: Enable OCR + Gemini OCR analysis
+            verbose: Print detailed output during analysis (True/False)
+            summary_type: 'simple' or 'detailed' summary output
+        """
         self.clip_engine = BankStatementCLIPEngine()
         self.ela_threshold = ela_threshold
         self.use_gemini = use_gemini
         self.use_ocr = use_ocr
+        self.verbose = verbose
+        self.summary_type = summary_type
         self.gemini_vision_time = 0.0
         self.gemini_ocr_time = 0.0
         self.print_lock = threading.Lock()
         
-        # Initialize Vision analyzer (uses OPENROUTER_API_KEY from env)
+        # Initialise vision and OCR analysers
         if self.use_gemini:
             try:
                 self.gemini_detector = GeminiTamperingDetector()
-                print("[Vision Analysis enabled]")
+                # print("[Vision Analysis enabled]")
             except Exception as e:
                 print(f"⚠️  Vision initialization failed: {e}")
                 self.use_gemini = False
-        
-        # Initialize OCR analyzer (uses OPENROUTER_API_KEY from env)
+
         if self.use_ocr:
             try:
                 self.gemini_ocr_analyzer = GeminiOCRAnalyzer()
-                print("[OCR + LLM Analysis enabled]")
+                # print("[OCR + LLM Analysis enabled]")
             except Exception as e:
                 print(f"⚠️  OCR Analyzer initialization failed: {e}")
                 self.use_ocr = False
@@ -69,12 +90,12 @@ class FraudDetectionSystem:
             return []
         
         layers = "ELA + CLIP + Metadata + Gemini Vision" + (" + OCR + Gemini OCR" if self.use_ocr else "")
-        print(f"\n{'='*80}\nBatch Analysis (Parallel): {len(image_paths)} files ({layers})\n{'='*80}\n")
+        # print(f"\n{'='*80}\nBatch Analysis (Parallel): {len(image_paths)} files ({layers})\n{'='*80}\n")
         
         results = []
         max_workers = 4 # Depends on CPU threads
         
-        print(f"Starting ThreadPool with {max_workers} workers")
+        # print(f"Starting ThreadPool with {max_workers} workers")
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_file = {
@@ -96,7 +117,10 @@ class FraudDetectionSystem:
 
         elapsed_time = time.time() - start_time
         # Total time spend, could be inaccuracies due to multi-threading
-        self._print_batch_summary(results, elapsed_time, self.gemini_vision_time, self.gemini_ocr_time)
+        if self.summary_type == 'simple':
+            self._print_batch_summary_simple(results)
+        else:
+            self._print_batch_summary(results, elapsed_time, self.gemini_vision_time, self.gemini_ocr_time)
         return results
 
     def _analyze_single_safe_capture(self, img_path: str, idx: int, total: int):
@@ -109,23 +133,21 @@ class FraudDetectionSystem:
         filename = Path(img_path).name
         
         # Thread lock for thread safety
-        with self.print_lock:
-            print(f"\n{'='*80}")
-            print(f"[Thread {threading.current_thread().name}] 🚀 Starting: {filename}")
-            print(f"{'='*80}")
+        # with self.print_lock:
+        #     print(f"\n{'='*80}")
+        #     print(f"[Thread {threading.current_thread().name}] 🚀 Starting: {filename}")
         
         try:
             result = self._analyze_single(img_path, idx, total)
-            with self.print_lock:
-                print(f"\n{'='*80}")
-                print(f"[Thread {threading.current_thread().name}] ✅ Completed: {filename} → {result.get('recommendation', 'UNKNOWN')}")
-                print(f"{'='*80}\n")
+            # with self.print_lock:
+            #     print(f"\n{'='*80}")
+            #     print(f"[Thread {threading.current_thread().name}] ✅ Completed: {filename} → {result.get('recommendation', 'UNKNOWN')}")
             
             return result, ""  
             
         except Exception as e:
-            with self.print_lock:
-                print(f"\n❌ [Thread {threading.current_thread().name}] ERROR processing {filename}: {e}\n")
+            # with self.print_lock:
+            #     print(f"\n❌ [Thread {threading.current_thread().name}] ERROR processing {filename}: {e}\n")
             return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}, ""
     
     def _get_image_paths(self, folder_path: str) -> list:
@@ -141,10 +163,15 @@ class FraudDetectionSystem:
             print("❌ No images found")
         return paths
     
+    def _vprint(self, *args, **kwargs):
+        """Verbose print - only prints if verbose mode is enabled"""
+        if self.verbose:
+            print(*args, **kwargs)
+    
     def _analyze_single(self, img_path: str, idx: int, total: int) -> dict:
         """Analyze single image (Logic unchanged, output is captured by wrapper)"""
         # Save the printing to buffer
-        print(f"\n[{idx}/{total}] {Path(img_path).name} (Processing...)")
+        self._vprint(f"\n[{idx}/{total}] {Path(img_path).name} (Processing...)")
         
         try:
             # 1. Metadata
@@ -162,9 +189,9 @@ class FraudDetectionSystem:
                     break
             
             if detected_software:
-                print(f"\n  ⚠️  REJECT: High-risk editing software detected: {detected_software}")
-                print(f"  This document was edited with professional software commonly used for forgery.")
-                print(f"  Skipping further analysis - CONFIRMED FRAUDULENT.")
+                self._vprint(f"\n  ⚠️  REJECT: High-risk editing software detected: {detected_software}")
+                self._vprint(f"  This document was edited with professional software commonly used for forgery.")
+                self._vprint(f"  Skipping further analysis - CONFIRMED FRAUDULENT.")
                 result = {
                     'image_path': img_path,
                     'ela': {'skipped': True},
@@ -185,8 +212,8 @@ class FraudDetectionSystem:
             # 2. CLIP
             clip_result = self._run_clip(img_path)
             if not clip_result['is_bank_statement']:
-                print(f"\n  REJECT: Not a bank statement, detected by CLIP, skip.")
-                print(f"Please check if you have submitted the right bank statement. Please report if this is a misjudgement. Thank you!")              
+                self._vprint(f"\n  REJECT: Not a bank statement, detected by CLIP, skip.")
+                self._vprint(f"Please check if you have submitted the right bank statement. Please report if this is a misjudgement. Thank you!")              
                 result = {
                     'image_path': img_path,
                     'ela': {'skipped': True},
@@ -240,65 +267,66 @@ class FraudDetectionSystem:
             return result
             
         except Exception as e:
-            print(f"  ❌ Error: {e}")
+            self._vprint(f"  ❌ Error: {e}")
             import traceback
-            traceback.print_exc()
+            if self.verbose:
+                traceback.print_exc()
             return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}
     
     def _run_ela(self, img_path: str) -> dict:
         """Run ELA detection (skip for PDF and PNG)"""
         if img_path.lower().endswith('.pdf') or img_path.lower().endswith('.PDF') or img_path.lower().endswith('.png'):
-            print(f"\n  [ELA Detection - SKIPPED for PDF and PNG]")
+            self._vprint(f"\n  [ELA Detection - SKIPPED for PDF and PNG]")
             return {'verdict': 'SKIPPED', 'is_suspicious': False, 'max_difference': 0.0, 'skipped': True}
         
-        print(f"\n  [ELA Detection]")
+        self._vprint(f"\n  [ELA Detection]")
         result = ela_detect(img_path, threshold=self.ela_threshold)
         result['skipped'] = False
-        print(f"    Verdict: {result['verdict']}, Max Diff: {result['max_difference']:.1f}")
+        self._vprint(f"    Verdict: {result['verdict']}, Max Diff: {result['max_difference']:.1f}")
         return result
     
     def _run_clip(self, img_path: str) -> dict:
         """Run CLIP document type classification"""
-        print(f"\n  [CLIP Document Classification]")
+        self._vprint(f"\n  [CLIP Document Classification]")
         result = self.clip_engine.classify_document(img_path)
-        print(f"    Predicted Type: {result['predicted_type']}")
-        print(f"    Is Bank Statement: {result['is_bank_statement']}")
-        print(f"    Confidence: {result['confidence']:.1%}")
+        self._vprint(f"    Predicted Type: {result['predicted_type']}")
+        self._vprint(f"    Is Bank Statement: {result['is_bank_statement']}")
+        self._vprint(f"    Confidence: {result['confidence']:.1%}")
         return result
     
     def _run_gemini(self, img_path: str) -> dict:
         """Run Gemini vision analysis"""
-        print(f"\n  [Gemini Vision Analysis]")
+        self._vprint(f"\n  [Gemini Vision Analysis]")
         start = time.time()
         result = self.gemini_detector.analyze_tampering(img_path)
         gemini_vision_time = time.time() - start
         self.gemini_vision_time += gemini_vision_time  # Might not be thread-safe
-        print(f"    {result['tampering_detected'] and 'Tampering' or 'Clean'} | "
+        self._vprint(f"    {result['tampering_detected'] and 'Tampering' or 'Clean'} | "
               f"Confidence: {result['confidence']:.1%} | Risk: {result['risk_level']}")
         if result['findings']:
-            print(f"    Vision {img_path} Findings: {', '.join(result['findings'][:2])}")
-        print(f"    ⏱️  Gemini Vision Time: {gemini_vision_time:.2f}s")
+            self._vprint(f"    Vision {img_path} Findings: {', '.join(result['findings'][:2])}")
+        self._vprint(f"    ⏱️  Gemini Vision Time: {gemini_vision_time:.2f}s")
         result['gemini_vision_time'] = gemini_vision_time
         return result
     
     def _run_metadata(self, img_path: str) -> dict:
         """Run Metadata Analysis"""
-        print(f"\n  [Metadata Analysis]")
+        self._vprint(f"\n  [Metadata Analysis]")
         try:
             metadata = extract_metadata(img_path)
             flags = check_tampering_indicators(metadata)
             time_diff = metadata.get('file_info', {}).get('time_diff_seconds', 0) # Check for key indicators of tampering in Metadata
             has_editing_software = any('editing_software' in flag.lower() for flag in flags)
             
-            print(f"    Time Difference: {time_diff}s")
+            self._vprint(f"    Time Difference: {time_diff}s")
             # Show which editing software was detected
             editing_sw_flags = [f for f in flags if 'editing_software' in f.lower()]
             if editing_sw_flags:
-                print(f"    Editing Software Detected: {editing_sw_flags}")
+                self._vprint(f"    Editing Software Detected: {editing_sw_flags}")
             else:
-                print(f"    Editing Software Detected: False")
+                self._vprint(f"    Editing Software Detected: False")
             if flags:
-                print(f"    Flags: {', '.join(flags[:3])}")
+                self._vprint(f"    Flags: {', '.join(flags[:3])}")
             
             return {
                 'metadata': metadata,
@@ -307,12 +335,12 @@ class FraudDetectionSystem:
                 'editing_software_detected': has_editing_software
             }
         except Exception as e:
-            print(f"    ⚠️ Metadata extraction failed: {e}")
+            self._vprint(f"    ⚠️ Metadata extraction failed: {e}")
             return {'error': str(e), 'flags': [], 'time_diff_seconds': 0, 'editing_software_detected': False}
     
     def _run_ocr(self, img_path: str) -> dict:
         """Run OCR extraction"""
-        print(f"\n  [OCR Extraction]")
+        self._vprint(f"\n  [OCR Extraction]")
         try:
             start = time.time()
             ocr_data = extract_text_from_image(img_path)
@@ -331,10 +359,10 @@ class FraudDetectionSystem:
             total_lines = len(ocr_data.get('text_lines', []))
             full_text_len = len(ocr_data.get('full_text', ''))
             
-            print(f"    Total Text Lines: {total_lines}")
-            print(f"    Full Text Extracted: {full_text_len:,} characters")
-            print(f"    OCR Output saved to: {ocr_file}")
-            print(f"    ⏱️  OCR Extraction Time: {ocr_time:.2f}s")
+            self._vprint(f"    Total Text Lines: {total_lines}")
+            self._vprint(f"    Full Text Extracted: {full_text_len:,} characters")
+            self._vprint(f"    OCR Output saved to: {ocr_file}")
+            self._vprint(f"    ⏱️  OCR Extraction Time: {ocr_time:.2f}s")
             
             return {
                 'ocr_data': ocr_data,
@@ -344,15 +372,15 @@ class FraudDetectionSystem:
                 'ocr_time': ocr_time
             }
         except Exception as e:
-            print(f"    ❌ OCR failed: {e}")
+            self._vprint(f"    ❌ OCR failed: {e}")
             return {'error': str(e), 'ocr_time': 0.0}
     
     def _run_gemini_ocr(self, ocr_result: dict, filename: str = "") -> dict:
         """Run Gemini OCR analysis"""
-        print(f"\n  [Gemini OCR Analysis] -" if filename else "\n  [Gemini OCR Analysis]")
+        self._vprint(f"\n  [Gemini OCR Analysis] -" if filename else "\n  [Gemini OCR Analysis]")
         try:
             if 'error' in ocr_result:
-                print(f"    Skipped (OCR failed)")
+                self._vprint(f"    Skipped (OCR failed)")
                 return None
             
             start = time.time()
@@ -366,41 +394,41 @@ class FraudDetectionSystem:
             confidence = analysis.get('confidence', 0.0)
             risk_level = analysis.get('risk_level', 'UNKNOWN')
             
-            print(f"    OCR FRAUD_DETECTED{filename}: {fraud_detected and 'YES' or 'NO'}")
-            print(f"    CONFIDENCE: {confidence:.1%}")
-            print(f"    RISK_LEVEL: {risk_level}")
+            self._vprint(f"    OCR FRAUD_DETECTED{filename}: {fraud_detected and 'YES' or 'NO'}")
+            self._vprint(f"    CONFIDENCE: {confidence:.1%}")
+            self._vprint(f"    RISK_LEVEL: {risk_level}")
             
             # Print suspicious transactions
             suspicious_trans = analysis.get('suspicious_transactions', [])
-            print(f"\n    SUSPICIOUS_TRANSACTIONS:")
+            self._vprint(f"\n    SUSPICIOUS_TRANSACTIONS:")
             if suspicious_trans:
                 for trans in suspicious_trans:
-                    print(f"      - {trans}")
+                    self._vprint(f"      - {trans}")
             else:
-                print(f"      - None detected")
+                self._vprint(f"      - None detected")
             
             # Print patterns detected
             patterns = analysis.get('patterns_detected', [])
-            print(f"\n    PATTERNS_DETECTED:")
+            self._vprint(f"\n    PATTERNS_DETECTED:")
             if patterns:
                 for pattern in patterns:
-                    print(f"      - {pattern}")
+                    self._vprint(f"      - {pattern}")
             else:
-                print(f"      - No unusual patterns")
+                self._vprint(f"      - No unusual patterns")
             
-            print(f"\n RECOMMENDATION: {analysis.get('recommendation', 'UNKNOWN')}")
-            print(f"Gemini OCR Time: {gemini_ocr_time:.2f}s")
+            self._vprint(f"\n RECOMMENDATION: {analysis.get('recommendation', 'UNKNOWN')}")
+            self._vprint(f"Gemini OCR Time: {gemini_ocr_time:.2f}s")
             
             # Print reason/explanation if fraud detected
             if fraud_detected:
                 explanation = analysis.get('explanation', '')
                 if explanation:
-                    print(f"\n    Reason: {explanation}")
+                    self._vprint(f"\n    Reason: {explanation}")
             
             analysis['gemini_ocr_time'] = gemini_ocr_time
             return analysis
         except Exception as e:
-            print(f"    ❌ Gemini OCR analysis failed: {e}")
+            self._vprint(f"    ❌ Gemini OCR analysis failed: {e}")
             return {'error': str(e), 'gemini_ocr_time': 0.0}
     
     def _calculate_risk(self, ela_result: dict, clip_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> tuple:
@@ -473,17 +501,64 @@ class FraudDetectionSystem:
         """Print analysis result with risk calculation breakdown"""
         layers = 5
         filename = Path(result.get('image_path', 'Unknown')).name
-        print(f"\n  [Combined Result ({layers}-Layer Analysis)] - {filename}")
+        self._vprint(f"\n  [Combined Result ({layers}-Layer Analysis)] - {filename}")
         
         # Print risk calculation breakdown
         contributions = result.get('risk_calculation_steps', {})
         if contributions:
-            print(f"    Risk Breakdown: ELA: {contributions.get('ELA', 0):.2f} | Metadata: {contributions.get('Metadata', 0):.2f} | Gemini Vision: {contributions.get('Gemini Vision', 0):.2f} | Gemini OCR: {contributions.get('Gemini OCR', 0):.2f}")
+            self._vprint(f"    Risk Breakdown: ELA: {contributions.get('ELA', 0):.2f} | Metadata: {contributions.get('Metadata', 0):.2f} | Gemini Vision: {contributions.get('Gemini Vision', 0):.2f} | Gemini OCR: {contributions.get('Gemini OCR', 0):.2f}")
         
-        print(f"    Final Risk Score: {result['final_risk_score']:.2f}")
-        print(f"    Final Risk Level: {result['final_risk_level']}")
-        print(f"    Recommendation: {result['recommendation']}")
-        print(f"    {'='*60}")
+        self._vprint(f"    Final Risk Score: {result['final_risk_score']:.2f}")
+        self._vprint(f"    Final Risk Level: {result['final_risk_level']}")
+        self._vprint(f"    Recommendation: {result['recommendation']}")
+        self._vprint(f"    {'='*60}")
+    
+    def _print_batch_summary_simple(self, results: list):
+        """Print simplified batch summary - Fraud: YES (reason) or NO"""
+        for r in results:
+            filename = Path(r.get('image_path', 'Unknown')).name
+            recommendation = r.get('recommendation', 'UNKNOWN')
+            
+            if recommendation == 'ACCEPT':
+                print(f"{filename}: NO")
+            else:
+                # Determine fraud reason
+                reasons = []
+                
+                # Check early termination reason
+                if r.get('early_termination'):
+                    term_reason = r.get('termination_reason', '')
+                    if 'editing software' in term_reason.lower():
+                        reasons.append('Edited with tampering software')
+                    elif 'non-bank statement' in term_reason.lower():
+                        reasons.append('Not a bank statement')
+                    else:
+                        reasons.append(term_reason)
+                else:
+                    # Check individual layer results
+                    if r.get('ela', {}).get('is_suspicious'):
+                        reasons.append('Image tampering (ELA)')
+                    
+                    if r.get('metadata', {}).get('editing_software_detected'):
+                        reasons.append('Editing software detected')
+                    
+                    if r.get('gemini', {}).get('tampering_detected'):
+                        findings = r.get('gemini', {}).get('findings', [])
+                        if findings:
+                            reasons.append(f"Visual tampering: {findings[0]}")
+                        else:
+                            reasons.append('Visual tampering detected')
+                    
+                    if (r.get('gemini_ocr') or {}).get('fraud_detected'):
+                        patterns = (r.get('gemini_ocr') or {}).get('patterns_detected', [])
+                        if patterns:
+                            reasons.append(f"Transaction fraud: {patterns[0]}")
+                        else:
+                            reasons.append('Transaction anomaly detected')
+                
+                reason_str = '; '.join(reasons) if reasons else 'Suspicious'
+                print(f"{filename}: YES ({reason_str})")
+        
     
     def _print_batch_summary(self, results: list, elapsed_time: float = None, gemini_vision_time: float = 0.0, gemini_ocr_time: float = 0.0):
         """Print batch summary with file lists and timing breakdown"""
@@ -493,9 +568,9 @@ class FraudDetectionSystem:
         reject_files = [Path(r['image_path']).name for r in results if r.get('recommendation') == 'REJECT']
         
         # Calculate layer-specific times from individual results
-        ocr_time_total = sum(r.get('ocr', {}).get('ocr_time', 0) for r in results)
-        gemini_vision_time_total = sum(r.get('gemini', {}).get('gemini_vision_time', 0) for r in results if r.get('gemini'))
-        gemini_ocr_time_total = sum(r.get('gemini_ocr', {}).get('gemini_ocr_time', 0) for r in results if r.get('gemini_ocr'))
+        ocr_time_total = sum((r.get('ocr') or {}).get('ocr_time', 0) for r in results)
+        gemini_vision_time_total = sum((r.get('gemini') or {}).get('gemini_vision_time', 0) for r in results if r.get('gemini'))
+        gemini_ocr_time_total = sum((r.get('gemini_ocr') or {}).get('gemini_ocr_time', 0) for r in results if r.get('gemini_ocr'))
         
         print(f"\n{'='*80}")
         print("BATCH SUMMARY")
@@ -577,11 +652,44 @@ class FraudDetectionSystem:
 def main():
     overall_start_time = time.time()
     
-    # Initialise system with full 6-layer pipeline (specific ones can be disabled by = False)
-    # API keys are loaded from environment variables in each module
+    # User options
+    # print("\n" + "="*60)
+    # print("FRAUD DETECTION SYSTEM - Configuration")
+    # print("="*60)
+    
+    # # Option 1: Verbose mode
+    # print("\nVerbose mode (detailed output during analysis)?")
+    # print("  1. Yes - Show all details")
+    # print("  2. No  - Silent mode (faster)")
+    # try:
+    #     verbose_choice = input("Select [1/2] (default=2): ").strip()
+    #     verbose = verbose_choice == '1'
+    # except:
+    #     verbose = False
+    
+    # # Option 2: Summary type
+    # print("\nSummary output format?")
+    # print("  1. Simple  - Just YES/NO with reason")
+    # print("  2. Detailed - Full statistics and timing")
+    # try:
+    #     summary_choice = input("Select [1/2] (default=1): ").strip()
+    #     summary_type = 'detailed' if summary_choice == '2' else 'simple'
+    # except:
+    #     summary_type = 'simple'
+    
+    # print(f"\n✓ Verbose: {verbose}, Summary: {summary_type}")
+    # print("="*60 + "\n")
+    
+    # Default: Silent mode + Simple summary
+    verbose = False
+    summary_type = 'simple'
+    
+    # Initialise system with user options
     system = FraudDetectionSystem(
         use_gemini=True, 
-        use_ocr=True
+        use_ocr=True,
+        verbose=verbose,
+        summary_type=summary_type
     )
     
     folder_path = "./dataset"

@@ -2,8 +2,7 @@
 Vision API for Bank Statement Tampering Detection
 """
 import google.generativeai as genai
-import openai
-import base64
+
 from PIL import Image
 import os
 from typing import Dict
@@ -22,7 +21,7 @@ class GeminiTamperingDetector:
             raise ValueError("GEMINI_API_KEY not found. Set it in environment or pass as parameter.")
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(model_of_choice)
-        print("[Gemini Vision Initialized]")
+        # print("[Gemini Vision Initialized]")
     
     def analyze_tampering(self, image_path: str) -> Dict:
         """
@@ -46,7 +45,7 @@ class GeminiTamperingDetector:
             if image_path.lower().endswith('.png'):
                 media_type = "image/png"
             elif image_path.lower().endswith('.pdf'):
-                media_type = "image/png"  # Converted from PDF
+                media_type = "image/png" 
             else:
                 media_type = "image/jpeg"
             

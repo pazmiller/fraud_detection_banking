@@ -23,7 +23,7 @@ def initialize_ocr_pool():
         if _ocr_pool_initialized:
             return
         
-        print(f"[OCR Pool] Initializing {_ocr_parallel_count} independent OCR engines...")
+        # print(f"[OCR Pool] Initializing {_ocr_parallel_count} independent OCR engines...")
         
         for i in range(_ocr_parallel_count):
             try:
@@ -40,14 +40,14 @@ def initialize_ocr_pool():
                     det_limit_type='max'
                 )
                 _ocr_pool.append(ocr_engine)
-                print(f"[OCR Pool] Engine {i+1}/{_ocr_parallel_count} initialized")
+                # print(f"[OCR Pool] Engine {i+1}/{_ocr_parallel_count} initialized")
             except Exception as e:
                 print(f"[OCR Pool ERROR] Failed to initialize engine {i+1}: {e}")
                 raise
         
         _ocr_semaphore = threading.Semaphore(value=_ocr_parallel_count)
         _ocr_pool_initialized = True
-        print(f"[OCR Pool] All {_ocr_parallel_count} engines ready!")
+        # print(f"[OCR Pool] All {_ocr_parallel_count} engines ready!")
 
 
 def get_ocr_engine():
@@ -99,14 +99,14 @@ def extract_text_from_image(image_path: str) -> dict:
         result = ocr.ocr(image_path, cls=True)
         
     except IndexError as e:
-        import traceback
-        print(f"[DEBUG] IndexError details:")
-        print(traceback.format_exc())
+        # import traceback
+        # print(f"[DEBUG] IndexError details:")
+        # print(traceback.format_exc())
         raise RuntimeError(f"PaddleOCR IndexError: {e}")
     except Exception as e:
-        import traceback
-        print(f"[DEBUG] Exception details:")
-        print(traceback.format_exc())
+        # import traceback
+        # print(f"[DEBUG] Exception details:")
+        # print(traceback.format_exc())
         raise RuntimeError(f"PaddleOCR execution failed: {e}")
 
     if result is None:
