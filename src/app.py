@@ -1,6 +1,6 @@
 """
-Bank Statement Fraud Detection - ELA + CLIP + Gemini Integration
-Workflow: Image → ELA → CLIP → Gemini Vision → Final Decision
+Bank Statement Fraud Detection - ELA + Gemini Integration
+Workflow: Image → Metadata → ELA → Gemini Vision → Final Decision
 """
 import warnings
 # Suppress Google API Python version warnings
@@ -28,7 +28,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.clip_module import BankStatementCLIPEngine
 from src.ela_detection import ela_detect
 from src.llm import GeminiTamperingDetector, GeminiOCRAnalyzer
 from src.ocr_test import extract_text_from_image
@@ -41,7 +40,7 @@ results_dir.mkdir(exist_ok=True)
 json_results_store_path = results_dir / "results_record_Gemini-2.5-pro.json"
 
 class FraudDetectionSystem:
-    """Combined ELA + CLIP + Metadata + Gemini + OCR + Gemini OCR Analysis (5-Layer Pipeline)"""
+    """Combined ELA + Metadata + Gemini + OCR + Gemini OCR Analysis (4-Layer Pipeline)"""
     
     def __init__(self, ela_threshold=30.0, use_gemini=True, use_ocr=True, verbose=True, summary_type='simple'):
         """
@@ -52,7 +51,6 @@ class FraudDetectionSystem:
             verbose: Print detailed output during analysis (True/False)
             summary_type: 'simple' or 'detailed' summary output
         """
-        self.clip_engine = BankStatementCLIPEngine()
         self.ela_threshold = ela_threshold
         self.use_gemini = use_gemini
         self.use_ocr = use_ocr
@@ -89,7 +87,7 @@ class FraudDetectionSystem:
         if not image_paths:
             return []
         
-        layers = "ELA + CLIP + Metadata + Gemini Vision" + (" + OCR + Gemini OCR" if self.use_ocr else "")
+        layers = "ELA + Metadata + Gemini Vision" + (" + OCR + Gemini OCR" if self.use_ocr else "")
         # print(f"\n{'='*80}\nBatch Analysis (Parallel): {len(image_paths)} files ({layers})\n{'='*80}\n")
         
         results = []
@@ -195,7 +193,6 @@ class FraudDetectionSystem:
                 result = {
                     'image_path': img_path,
                     'ela': {'skipped': True},
-                    'clip': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
                     'metadata': metadata_result,
                     'gemini': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
                     'ocr': {'skipped': True, 'reason': f'High-risk editing software: {detected_software}'},
@@ -209,50 +206,27 @@ class FraudDetectionSystem:
                 self._print_result(result)
                 return result
             
-            # 2. CLIP
-            clip_result = self._run_clip(img_path)
-            if not clip_result['is_bank_statement']:
-                self._vprint(f"\n  REJECT: Not a bank statement, detected by CLIP, skip.")
-                self._vprint(f"Please check if you have submitted the right bank statement. Please report if this is a misjudgement. Thank you!")              
-                result = {
-                    'image_path': img_path,
-                    'ela': {'skipped': True},
-                    'clip': clip_result,
-                    'metadata': metadata_result,
-                    'gemini': {'skipped': True, 'reason': 'Not a bank statement'},
-                    'ocr': {'skipped': True, 'reason': 'Not a bank statement'},
-                    'gemini_ocr': {'skipped': True, 'reason': 'Not a bank statement'},
-                    'final_risk_score': 1.0,
-                    'final_risk_level': 'CRITICAL',
-                    'recommendation': 'REJECT',
-                    'early_termination': True,
-                    'termination_reason': 'CLIP detected non-bank statement document'
-                }
-                self._print_result(result)
-                return result
-
-            # 3. ELA
+            # 2. ELA
             ela_result = self._run_ela(img_path)
             
-            # 4. Gemini Vision
+            # 3. Gemini Vision
             gemini_result = None
             if self.use_gemini:
                 gemini_result = self._run_gemini(img_path)
                 time.sleep(1.0) 
 
-            # 5. OCR + Gemini OCR Analysis
+            # 4. OCR + Gemini OCR Analysis
             ocr_result = self._run_ocr(img_path) if self.use_ocr else None
             
             gemini_ocr_result = self._run_gemini_ocr(ocr_result, Path(img_path).name) if (self.use_ocr and ocr_result) else None
             
             # Calculate final risk
-            final_risk_score, calc_steps = self._calculate_risk(ela_result, clip_result, metadata_result, gemini_result, gemini_ocr_result)
+            final_risk_score, calc_steps = self._calculate_risk(ela_result, metadata_result, gemini_result, gemini_ocr_result)
             
             # Build result (including fraud recommendation)
             result = {
                 'image_path': img_path,
                 'ela': ela_result,
-                'clip': clip_result,
                 'metadata': metadata_result,
                 'gemini': gemini_result,
                 'ocr': ocr_result,
@@ -283,15 +257,6 @@ class FraudDetectionSystem:
         result = ela_detect(img_path, threshold=self.ela_threshold)
         result['skipped'] = False
         self._vprint(f"    Verdict: {result['verdict']}, Max Diff: {result['max_difference']:.1f}")
-        return result
-    
-    def _run_clip(self, img_path: str) -> dict:
-        """Run CLIP document type classification"""
-        self._vprint(f"\n  [CLIP Document Classification]")
-        result = self.clip_engine.classify_document(img_path)
-        self._vprint(f"    Predicted Type: {result['predicted_type']}")
-        self._vprint(f"    Is Bank Statement: {result['is_bank_statement']}")
-        self._vprint(f"    Confidence: {result['confidence']:.1%}")
         return result
     
     def _run_gemini(self, img_path: str) -> dict:
@@ -431,7 +396,7 @@ class FraudDetectionSystem:
             self._vprint(f"    ❌ Gemini OCR analysis failed: {e}")
             return {'error': str(e), 'gemini_ocr_time': 0.0}
     
-    def _calculate_risk(self, ela_result: dict, clip_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> tuple:
+    def _calculate_risk(self, ela_result: dict, metadata_result: dict = None, gemini_result: dict = None, gemini_ocr_result: dict = None) -> tuple:
         """Calculate combined risk score (4-layer) with detailed breakdown"""
         contributions = {}
         risk = 0.0
@@ -514,50 +479,69 @@ class FraudDetectionSystem:
         self._vprint(f"    {'='*60}")
     
     def _print_batch_summary_simple(self, results: list):
-        """Print simplified batch summary - Fraud: YES (reason) or NO"""
-        for r in results:
+        """Print simplified batch summary with detailed format"""
+        for idx, r in enumerate(results, 1):
             filename = Path(r.get('image_path', 'Unknown')).name
             recommendation = r.get('recommendation', 'UNKNOWN')
             
-            if recommendation == 'ACCEPT':
-                print(f"{filename}: NO")
-            else:
-                # Determine fraud reason
-                reasons = []
-                
-                # Check early termination reason
+            # Determine tampering detection
+            tampering_detected = "NO" if recommendation == 'ACCEPT' else "YES"
+            
+            # Extract what and where
+            what_where = ""
+            rationale = ""
+            
+            if tampering_detected == "YES":
+                # Check for early termination reasons first
                 if r.get('early_termination'):
                     term_reason = r.get('termination_reason', '')
+                    
+                    # Metadata detected high-risk editing software
                     if 'editing software' in term_reason.lower():
-                        reasons.append('Edited with tampering software')
-                    elif 'non-bank statement' in term_reason.lower():
-                        reasons.append('Not a bank statement')
+                        what_where = "Metadata"
+                        rationale = term_reason
+                    
                     else:
-                        reasons.append(term_reason)
-                else:
-                    # Check individual layer results
-                    if r.get('ela', {}).get('is_suspicious'):
-                        reasons.append('Image tampering (ELA)')
-                    
-                    if r.get('metadata', {}).get('editing_software_detected'):
-                        reasons.append('Editing software detected')
-                    
-                    if r.get('gemini', {}).get('tampering_detected'):
-                        findings = r.get('gemini', {}).get('findings', [])
-                        if findings:
-                            reasons.append(f"Visual tampering: {findings[0]}")
-                        else:
-                            reasons.append('Visual tampering detected')
-                    
-                    if (r.get('gemini_ocr') or {}).get('fraud_detected'):
-                        patterns = (r.get('gemini_ocr') or {}).get('patterns_detected', [])
-                        if patterns:
-                            reasons.append(f"Transaction fraud: {patterns[0]}")
-                        else:
-                            reasons.append('Transaction anomaly detected')
+                        rationale = term_reason
                 
-                reason_str = '; '.join(reasons) if reasons else 'Suspicious'
-                print(f"{filename}: YES ({reason_str})")
+                # Normal flow - check metadata issues first
+                else:
+                    metadata = r.get('metadata') or {}
+                    gemini = r.get('gemini') or {}
+                    gemini_ocr = r.get('gemini_ocr') or {}
+                    
+                    # Check if Metadata is the primary issue
+                    metadata_issues = []
+                    if metadata.get('editing_software_detected'):
+                        metadata_issues.append('Editing software detected')
+                    if metadata.get('time_diff_seconds', 0) > 100:
+                        metadata_issues.append('File edited long after its creation')
+                    
+                    # If metadata issues found, set what_where to Metadata
+                    if metadata_issues:
+                        what_where = "Metadata"
+                        rationale = '; '.join(metadata_issues)
+                    else:
+                        # Extract from Gemini Vision findings
+                        findings = gemini.get('findings', [])
+                        if findings:
+                            what_where = "; ".join(findings[:2])  # First 2 findings
+                        
+                        # Get rationale from Gemini OCR
+                        rationale = gemini_ocr.get('explanation', '')
+                        
+                        # Fallback rationale
+                        if not rationale:
+                            reasons = []
+                            if r.get('ela', {}).get('is_suspicious'):
+                                reasons.append('ELA detected tampering')
+                            if gemini.get('tampering_detected'):
+                                reasons.append('Visual tampering detected')
+                            if gemini_ocr.get('fraud_detected'):
+                                reasons.append('Transaction anomalies detected')
+                            rationale = '; '.join(reasons) if reasons else 'Suspicious activity detected'
+            
+            print(f"{idx}: {filename}, tampering detection: {tampering_detected}, what and where: \"{what_where}\", rationale: \"{rationale}\"")
         
     
     def _print_batch_summary(self, results: list, elapsed_time: float = None, gemini_vision_time: float = 0.0, gemini_ocr_time: float = 0.0):
@@ -693,7 +677,6 @@ def main():
     )
     
     folder_path = "./dataset"
-    # folder_path = "./src/clip/statements"
     results = system.batch_analyze(folder_path)
     
     # Final summary
