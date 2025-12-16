@@ -30,6 +30,7 @@ if __name__ == "__main__":
 
 from src.ela_detection import ela_detect
 from src.llm.gemini_vision_other import GeminiTamperingDetectorOther
+from src.llm.gemini_split_pages_other import GeminiPageSplitter
 from src.llm.gemini_ocr import GeminiOCRAnalyzer
 from src.ocr_test import extract_text_from_image
 from src.metadata import extract_metadata, check_tampering_indicators
@@ -53,7 +54,16 @@ class FraudDetectionSystem:
         self.gemini_ocr_time = 0.0
         self.print_lock = threading.Lock()
         
-        # Initialise
+        # Initialise Page Splitter (Layer 1)
+        if self.use_gemini:
+            try:
+                self.page_splitter = GeminiPageSplitter()
+                print("[Gemini Page Splitter Initialized in FraudDetectionSystem]")
+            except Exception as e:
+                print(f"⚠️  Page Splitter initialization failed: {e}")
+                self.page_splitter = None
+        
+        # Initialise Vision Detector (Layer 2)
         if self.use_gemini:
             try:
                 self.gemini_detector = GeminiTamperingDetectorOther()
@@ -120,17 +130,17 @@ class FraudDetectionSystem:
         time.sleep(sleep_time)
         
         filename = Path(img_path).name
-        print(f"[DEBUG] Starting analysis for {filename}...")
+        # print(f"[DEBUG] Starting analysis for {filename}...")
         
         try:
             result = self._analyze_single(img_path, idx, total)
-            print(f"[DEBUG] Finished analysis for {filename}")
+            # print(f"[DEBUG] Finished analysis for {filename}")
             return result, ""  
             
         except Exception as e:
             import traceback
-            print(f"[DEBUG] Exception in {filename}: {e}")
-            traceback.print_exc()
+            # print(f"[DEBUG] Exception in {filename}: {e}")
+            # traceback.print_exc()
             return {'image_path': img_path, 'error': str(e), 'recommendation': 'REJECT'}, ""
     
     def _get_image_paths(self, folder_path: str) -> list:
@@ -187,17 +197,64 @@ class FraudDetectionSystem:
             
             gemini_result = None
             financial_pages = None
+            split_pdf_path = None
+            layer1_time = 0.0
+            layer2_time = 0.0
+            all_pages = []
+            
             if self.use_gemini:
-                print(f"[DEBUG] Calling Gemini Vision for {Path(img_path).name}...")
-                gemini_result = self._run_gemini(img_path)
-                print(f"[DEBUG] Gemini Vision result: tampering={gemini_result.get('tampering_detected')}, findings={gemini_result.get('findings')}")
-                # Extract page identification from Gemini Vision result
-                financial_pages = {
-                    'income': gemini_result.get('income_page', 'Not Found'),
-                    'balance_sheet': gemini_result.get('balance_sheet_page', 'Not Found'),
-                    'cashflow': gemini_result.get('cashflow_page', 'Not Found')
-                }
-                print(f"[DEBUG] Financial pages: {financial_pages}")
+                # Layer 1: Page Identification & Splitting
+                if self.page_splitter and img_path.lower().endswith('.pdf'):
+                    # print(f"[DEBUG] Layer 1: Identifying financial pages for {Path(img_path).name}...")
+                    layer1_start = time.time()
+                    page_result = self.page_splitter.identify_financial_pages(img_path)
+                    
+                    financial_pages = {
+                        'income': page_result.get('income_pages', 'Not Found'),
+                        'balance_sheet': page_result.get('balance_sheet_pages', 'Not Found'),
+                        'cashflow': page_result.get('cashflow_pages', 'Not Found')
+                    }
+                    # print(f"[DEBUG] Financial pages identified: {financial_pages}")
+                    
+                    # Extract only financial pages for vision analysis
+                    all_pages = page_result.get('all_financial_pages', [])
+                    if all_pages:
+                        split_pdf_path = self.page_splitter.extract_pages_from_pdf(img_path, all_pages, save_to_folder=False)
+                        # print(f"[DEBUG] Extracted {len(all_pages)} pages to: {split_pdf_path}")
+                    
+                    layer1_time = time.time() - layer1_start
+                    # print(f"[DEBUG] Layer 1 completed in {layer1_time:.2f}s")
+                    time.sleep(1.0)  # Rate limit between API calls
+                
+                # Layer 2: Vision Tampering Detection 
+                analysis_path = split_pdf_path if split_pdf_path else img_path # (Load extracted pages or original)
+                using_split = split_pdf_path is not None
+                # print(f"[DEBUG] Layer 2: Calling Gemini Vision for {Path(analysis_path).name}...")
+                # print(f"[DEBUG] Using split PDF: {using_split} (pages: {len(all_pages) if all_pages else 'N/A'})")
+                layer2_start = time.time()
+                gemini_result = self._run_gemini(analysis_path)
+                layer2_time = time.time() - layer2_start
+                # print(f"[DEBUG] Layer 2 completed in {layer2_time:.2f}s")
+                
+                # Add page info and timing to result
+                if financial_pages:
+                    gemini_result['financial_pages'] = financial_pages
+                gemini_result['layer1_time'] = layer1_time
+                gemini_result['layer2_time'] = layer2_time
+                gemini_result['total_gemini_time'] = layer1_time + layer2_time
+                gemini_result['used_split_pdf'] = using_split
+                
+                # print(f"[DEBUG] Gemini Vision result: tampering={gemini_result.get('tampering_detected')}, findings={gemini_result.get('findings')}")
+                # print(f"[DEBUG] Total Gemini time: {layer1_time + layer2_time:.2f}s (Layer1: {layer1_time:.2f}s, Layer2: {layer2_time:.2f}s)")
+                
+                # Cleanup temp file
+                if split_pdf_path:
+                    try:
+                        import os
+                        os.remove(split_pdf_path)
+                    except:
+                        pass
+                
                 time.sleep(1.0)
             
             '''OCR Later_'''
@@ -215,15 +272,14 @@ class FraudDetectionSystem:
             gemini_ocr_result = None
             
             # Calculate final risk
-            print(f"[DEBUG] Calculating risk - ELA: {ela_result.get('is_suspicious')}, Metadata flags: {metadata_result.get('flags')}, time_diff: {metadata_result.get('time_diff_seconds')}")
             final_risk_score, calc_steps = self._calculate_risk(ela_result, metadata_result, gemini_result, gemini_ocr_result)
-            print(f"[DEBUG] Risk calculation: score={final_risk_score}, steps={calc_steps}")
             
             # Build result (including fraud recommendation)
             result = {
                 'image_path': img_path,
                 'ela': ela_result,
                 'metadata': metadata_result,
+                'financial_pages': financial_pages,
                 'gemini': gemini_result,
                 'ocr': ocr_result,
                 'gemini_ocr': gemini_ocr_result,
@@ -397,67 +453,54 @@ class FraudDetectionSystem:
         """Print simplified batch summary with detailed format"""
         for idx, r in enumerate(results, 1):
             filename = Path(r.get('image_path', 'Unknown')).name
-            recommendation = r.get('recommendation', 'UNKNOWN')
             
-            tampering_detected = "NO" if recommendation == 'ACCEPT' else "YES"
+            # Extract components
+            metadata = r.get('metadata') or {}
+            gemini = r.get('gemini') or {}
+            gemini_ocr = r.get('gemini_ocr') or {}
             
-            # Extract what and where
+            gemini_tampering = gemini.get('tampering_detected', False)
+            gemini_findings = gemini.get('findings', [])
+            
+            # Determine tampering status
             what_where = ""
             rationale = ""
             
-            if tampering_detected == "YES":
-                # Check for early termination reasons first
-                if r.get('early_termination'):
-                    term_reason = r.get('termination_reason', '')
-                    
-                    # Metadata detected high-risk editing software
-                    if 'editing software' in term_reason.lower():
-                        what_where = "Metadata"
-                        rationale = term_reason
-                    
-                    else:
-                        rationale = term_reason
-                # Flow
+            # Check for early termination (high-risk software)
+            if r.get('early_termination'):
+                tampering_detected = "YES"
+                term_reason = r.get('termination_reason', '')
+                what_where = "Metadata"
+                rationale = term_reason
+            
+            # Check Gemini Vision tampering
+            elif gemini_tampering:
+                tampering_detected = "YES"
+                if gemini_findings:
+                    what_where = gemini_findings[0]  # First finding as what/where
+                    rationale = "Visual tampering detected"
+                    if len(gemini_findings) > 1:
+                        # Add additional context
+                        rationale += "; " + "; ".join(gemini_findings[1:3])  # Up to 2 more findings
                 else:
-                    metadata = r.get('metadata') or {}
-                    gemini = r.get('gemini') or {}
-                    gemini_ocr = r.get('gemini_ocr') or {}
-                    
-                    # Check if Metadata is the primary issue
-                    metadata_issues = []
-                    if metadata.get('editing_software_detected'):
-                        metadata_issues.append('Editing software detected')
-                    if metadata.get('time_diff_seconds', 0) > 100:
-                        metadata_issues.append('File edited long after its creation')
-                    
-                    # If metadata issues found, set what_where to Metadata
-                    if metadata_issues:
-                        what_where = "Metadata"
-                        rationale = '; '.join(metadata_issues)
-                    else:
-                        # Extract from Gemini Vision findings
-                        findings = gemini.get('findings', [])
-                        if findings:
-                            what_where = "; ".join(findings[:2])  # First 2 findings
-                        
-                        # Get rationale from Gemini OCR
-                        rationale = gemini_ocr.get('explanation', '')
-                        
-                        # Fallback to Gemini Vision findings
-                        if not rationale and findings:
-                            rationale = findings[0]
-                        
-                        if not rationale and gemini.get('tampering_detected'):
-                            what_where = "Gemini Vision"
-                            rationale = f"Visual tampering detected (confidence: {gemini.get('confidence', 0):.0%})"
-
-                        if not rationale and gemini_ocr.get('fraud_detected'):
-                            what_where = "Gemini OCR"
-                            rationale = "Cross-statement inconsistency detected"
-                        
-                        # Final fallback
-                        if not rationale:
-                            rationale = 'Suspicious activity detected'
+                    what_where = "Gemini Vision"
+                    rationale = f"Visual tampering detected (confidence: {gemini.get('confidence', 0):.0%})"
+            
+            # Check Metadata issues
+            elif metadata.get('editing_software_detected'):
+                tampering_detected = "YES"
+                what_where = "Metadata"
+                rationale = "Editing software detected"
+            
+            # Check Gemini OCR
+            elif gemini_ocr.get('fraud_detected'):
+                tampering_detected = "YES"
+                what_where = "Gemini OCR"
+                rationale = gemini_ocr.get('explanation', 'Cross-statement inconsistency detected')
+            
+            # No tampering detected
+            else:
+                tampering_detected = "NO"
             
             print(f"{idx}: {filename}, tampering detection: {tampering_detected}, what and where: \"{what_where}\", rationale: \"{rationale}\"")
 

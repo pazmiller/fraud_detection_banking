@@ -46,57 +46,44 @@ class GeminiTamperingDetectorOther:
                 media_type = "image/jpeg"
             
             prompt = """
-             <ANALYSIS CRITERIA RULES>
-            1. Visual Consistency
-            -If the background "noise" or texture suddenly disappears behind specific numbers (indicating a digital patch).
-            -Look at the empty space SURROUNDING the transaction numbers. Does the texture/noise pattern suddenly become "flat" or "white" behind a specific number?
-            -Look for out of place smudges, ink, highlight, irregular colour or drawing that should not appear on financial statements.
-            -Look for indicators of tampering and editing such as Adobe, or oddly shaped text that differs from the rest of the same line
-            2. Alignment & Layout
-            -If a specific number clearly floats outside its column grid while neighbors are aligned.
-            3. Statement
-            - Signs of editing, erasing, or unusual text that appear ONLY around the transaction amount but nowhere else.
-            
-            
-            You are a meticulous Compliance Officer responsible for validating financial documents, you are sensitive to tampering signs. Your goal is to:
-            Step1. Identify in the document, the location of 3 types of financial statements: Income(Profit Loss), Balance Sheet, and Cash Flow. 
-            Remember, identify not the printed page in the file, identify the physical pdf file page use the offset(the printed page number 1 starts at the physical page 5, so the offest is 4) for calculating the physial pdf file page.
-            Remember, these 3 types of statements might locate in more than one places.
-            Step2. After identifying, focused on the loacted pages from Step1. Scrutinise these pages and identify evidence of document tampering by referring to  <ANALYSIS CRITERIA RULES>. 
-            Step3. Look through the document, if the pages number is not right, for example one page missing inbetween, it is a sign of tampering.
-            ---
-            #PAGE IDENTIFICATION
-            Identify which page(s) contain each financial statement:
-            - Income (Profit & Loss): Shows revenue, expenses, net income
-            - Balance Sheet: Shows assets, liabilities, equity
-            - Cash Flow : Shows operating, investing, financing cash flows
-            
-            If a statement spans multiple pages, list all pages (e.g., "1-2" or "1,2").
-            If not found, write "Not Found".
-            ---
-           
-    
-            
-            <EXCLUSION LIST>
-            -Global blurriness.
-            -Math.
-            -Standard variation in font weight (Bold/Normal) used for emphasis.
-            -Different fonts used for Headers vs. Body vs. Footers.
+You are a meticulous Compliance Officer responsible for validating financial documents.
+Your <task> is to scrutinize this document carefully and identify ANY evidence of document tampering based on the <ANALYSIS CRITERIA RULES> below.
 
-            ### RESPONSE FORMAT
+<ANALYSIS CRITERIA RULES>
+1. **Visual Consistency**
+   - If the background "noise" or texture suddenly disappears behind specific numbers (indicating a digital patch)
+   - Look at the empty space SURROUNDING the transaction numbers. Does the texture/noise pattern suddenly become "flat" or "white" behind a specific number?
+   - Look for out of place  ink, highlighter, irregular colour or drawing that should not appear on financial statements
+   - Look for indicators of tampering and editing such as Adobe watermarks, or manually written text, or oddly shaped text that differs from the rest of the same line
+   - Especially highlighter marks, that highlights a block of text in one specific colour such as yellow
 
-            Provide your analysis in this exact format:
+2. **Alignment & Layout**
+   - If a specific number clearly floats outside its column grid while neighbors are aligned
+   - Misaligned rows or columns that break the document's grid structure
 
-            INCOME_PAGE: [page number(s) or "Not Found"]
-            BALANCE_SHEET_PAGE: [page number(s) or "Not Found"]
-            CASHFLOW_PAGE: [page number(s) or "Not Found"]
-            
-            TAMPERING_DETECTED: [YES/NO] If any one of the rule from <ANALYSIS CRITERIA RULES> matched, return YES in TAMPERING_DETECTED.
-            CONFIDENCE: [0-100]%
-            FINDINGS:
-            - [Must list the findings if you think it is suspicious or fradulous]
+3. **Text Anomalies**
+   - Signs of editing, erasing, or unusual text that appear ONLY around the transaction amount but nowhere else
+   - Font inconsistencies within the same line or section
+   - Characters that appear slightly different in size, weight, or style compared to surrounding text
 
-            RECOMMENDATION: [ACCEPT/MANUAL_REVIEW/REJECT]
+## EXCLUSION LIST (Do NOT flag these as tampering)
+- Global blurriness (affects entire document equally)
+- Math errors or calculation mistakes
+- Standard variation in font weight (Bold/Normal) used for emphasis
+- Different fonts used for Headers vs. Body vs. Footers (intentional design)
+
+## RESPONSE FORMAT
+Provide your analysis in this exact format:
+
+TAMPERING_DETECTED: [YES/NO] - If any rule from ANALYSIS CRITERIA RULES matched , return YES
+CONFIDENCE: [0-100]%
+RISK_LEVEL: [LOW/MEDIUM/HIGH]
+FINDINGS:
+- [List each specific finding with page number and location if applicable]
+- [Be specific about what you observed and why it's suspicious]
+- [If highlighter/color marks found, describe the color, location, and what it covers]
+
+RECOMMENDATION: [ACCEPT/MANUAL_REVIEW/REJECT]
 """
             config = { "temperature": 0.1, }
             response = self.model.generate_content(
@@ -129,9 +116,6 @@ class GeminiTamperingDetectorOther:
         
         result = {
             'image_path': image_path,
-            'income_page': 'Not Found',
-            'balance_sheet_page': 'Not Found',
-            'cashflow_page': 'Not Found',
             'tampering_detected': False,
             'confidence': 0.0,
             'risk_level': 'LOW',
@@ -147,16 +131,7 @@ class GeminiTamperingDetectorOther:
             clean_line = line.strip().replace('**', '').replace('*', '').strip()
             upper_line = clean_line.upper()
             
-            if 'INCOME_PAGE' in upper_line and ':' in clean_line:
-                result['income_page'] = clean_line.split(':', 1)[1].strip()
-            
-            elif 'BALANCE_SHEET_PAGE' in upper_line and ':' in clean_line:
-                result['balance_sheet_page'] = clean_line.split(':', 1)[1].strip()
-            
-            elif 'CASHFLOW_PAGE' in upper_line and ':' in clean_line:
-                result['cashflow_page'] = clean_line.split(':', 1)[1].strip()
-            
-            elif 'TAMPERING_DETECTED' in upper_line and ':' in clean_line:
+            if 'TAMPERING_DETECTED' in upper_line and ':' in clean_line:
                 result['tampering_detected'] = 'YES' in upper_line
             
             elif 'CONFIDENCE' in upper_line and ':' in clean_line:
@@ -202,33 +177,103 @@ class GeminiTamperingDetectorOther:
 
 
 def demo():
-    """Demo usage"""
-    api_key = "YOUR_GEMINI_API_KEY"
-    detector = GeminiTamperingDetector(api_key=api_key)
-    image_path = "../clip/statements/ocbc_bank_statement.jpg"
-    result = detector.analyze_tampering(image_path)
+    """Demo usage - Test tampering detection with 2-layer approach"""
+    import os
+    import time
+    from pathlib import Path
+    from gemini_split_pages_other import GeminiPageSplitter
     
+    # Initialize both layers
+    splitter = GeminiPageSplitter()
+    detector = GeminiTamperingDetectorOther()
+    
+    # Test files - modify this path to your test file
+    test_folder = Path(__file__).parent.parent.parent / "dataset_other_documents"
+    
+    # Get PDF files for testing - change the number or remove slice to test all
+    # [:1] = first file only, [:3] = first 3 files, remove slice = all files
+    test_files = list(test_folder.glob("*.pdf"))  # All PDF files
+    
+    if not test_files:
+        print("No PDF files found in dataset_other_documents folder")
+        print("Please add test files or modify the path")
+        return
+    
+    print(f"Found {len(test_files)} PDF files to analyze\n")
+    
+    # Store results for summary
+    all_results = []
+    
+    for idx, image_path in enumerate(test_files, 1):
+        print("\n" + "="*80)
+        print(f"GEMINI FINANCIAL DOCUMENT ANALYSIS (2-LAYER) [{idx}/{len(test_files)}]")
+        print("="*80)
+        print(f"File: {image_path.name}")
+        
+        # Layer 1: Page Identification & Splitting
+        print("\n--- Layer 1: Page Identification ---")
+        layer1_start = time.time()
+        page_result = splitter.identify_financial_pages(str(image_path))
+        
+        print(f"Income Pages: {page_result['income_pages']}")
+        print(f"Balance Sheet Pages: {page_result['balance_sheet_pages']}")
+        print(f"Cash Flow Pages: {page_result['cashflow_pages']}")
+        print(f"All Financial Pages: {page_result['all_financial_pages']}")
+        
+        # Extract pages
+        split_pdf_path = None
+        all_pages = page_result.get('all_financial_pages', [])
+        if all_pages:
+            split_pdf_path = splitter.extract_pages_from_pdf(str(image_path), all_pages)
+            print(f"Extracted {len(all_pages)} pages to temp file")
+        
+        layer1_time = time.time() - layer1_start
+        print(f"Layer 1 Time: {layer1_time:.2f}s")
+        
+        time.sleep(1.0)  # Rate limit
+        
+        # Layer 2: Tampering Detection
+        print("\n--- Layer 2: Tampering Detection ---")
+        analysis_path = split_pdf_path if split_pdf_path else str(image_path)
+        print(f"Analyzing: {'Extracted pages' if split_pdf_path else 'Original file'}")
+        
+        layer2_start = time.time()
+        result = detector.analyze_tampering(analysis_path)
+        layer2_time = time.time() - layer2_start
+        
+        print(f"Tampering Detected: {result['tampering_detected']}")
+        print(f"Confidence: {result['confidence']:.1%}")
+        print(f"Risk Level: {result['risk_level']}")
+        print(f"Recommendation: {result['recommendation']}")
+        print(f"Layer 2 Time: {layer2_time:.2f}s")
+        
+        if result['findings']:
+            print("\nFindings:")
+            for finding in result['findings']:
+                print(f"  • {finding}")
+        
+        # Note: Split files are now saved to document_split folder for testing
+        if split_pdf_path:
+            print(f"\nSplit file saved to: {split_pdf_path}")
+        
+        print(f"\n--- Total Time: {layer1_time + layer2_time:.2f}s ---")
+        print("="*80)
+        
+        # Store result for summary
+        all_results.append({
+            'filename': image_path.name,
+            'tampering_detected': result['tampering_detected'],
+            'confidence': result['confidence'],
+            'recommendation': result['recommendation']
+        })
+    
+    # Print final summary
     print("\n" + "="*80)
-    print("GEMINI FINANCIAL DOCUMENT ANALYSIS")
+    print("SUMMARY")
     print("="*80)
-    print(f"Image: {result['image_path']}")
-    print(f"\n--- Page Identification ---")
-    print(f"Income Statement Page: {result['income_page']}")
-    print(f"Balance Sheet Page: {result['balance_sheet_page']}")
-    print(f"Cash Flow Page: {result['cashflow_page']}")
-    print(f"\n--- Tampering Analysis ---")
-    print(f"Tampering Detected: {result['tampering_detected']}")
-    print(f"Confidence: {result['confidence']:.1%}")
-    print(f"Risk Level: {result['risk_level']}")
-    print(f"Recommendation: {result['recommendation']}")
-    
-    if result['findings']:
-        print("\nFindings:")
-        for finding in result['findings']:
-            print(f"  • {finding}")
-    
-    print("\nRaw Response:")
-    print(result['raw_response'])
+    for idx, r in enumerate(all_results, 1):
+        tampering = "YES" if r['tampering_detected'] else "NO"
+        print(f"{idx}. {r['filename']}, Tampering Detected: {tampering}, Confidence: {r['confidence']:.0%}, Recommendation: {r['recommendation']}")
     print("="*80)
 
 
